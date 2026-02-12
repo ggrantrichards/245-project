@@ -1,0 +1,227 @@
+\begin{thebibliography}{16}
+\providecommand{\natexlab}[1]{#1}
+
+\bibitem[{Abdin et~al.(2024)Abdin, Aneja, Awadalla, Awadallah, Awan, Bach,
+  Bahree, Bakhtiari, Bao, Behl, Benhaim, Bilenko, Bjorck, Bubeck, Cai, Cai,
+  Chaudhary, Chen, Chen, Chen, Chen, Chen, Cheng, Chopra, Dai, Dixon, Eldan,
+  Fragoso, Gao, Gao, Gao, Garg, Giorno, Goswami, Gunasekar, Haider, Hao,
+  Hewett, Hu, Huynh, Iter, Jacobs, Javaheripi, Jin, Karampatziakis, Kauffmann,
+  Khademi, Kim, Kim, Kurilenko, Lee, Lee, Li, Li, Liang, Liden, Lin, Lin, Liu,
+  Liu, Liu, Liu, Liu, Luo, Madan, Mahmoudzadeh, Majercak, Mazzola, Mendes,
+  Mitra, Modi, Nguyen, Norick, Patra, Perez-Becker, Portet, Pryzant, Qin,
+  Radmilac, Ren, de~Rosa, Rosset, Roy, Ruwase, Saarikivi, Saied, Salim,
+  Santacroce, Shah, Shang, Sharma, Shen, Shukla, Song, Tanaka, Tupini,
+  Vaddamanu, Wang, Wang, Wang, Wang, Wang, Wang, Ward, Wen, Witte, Wu, Wu,
+  Wyatt, Xiao, Xu, Xu, Xu, Xue, Yadav, Yang, Yang, Yang, Yang, Yu, Yuan, Zhang,
+  Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, and Zhou}]{abdin2024phi3}
+Marah Abdin, Jyoti Aneja, Hany Awadalla, Ahmed Awadallah, Ammar~Ahmad Awan,
+  Nguyen Bach, Amit Bahree, Arash Bakhtiari, Jianmin Bao, Harkirat Behl, Alon
+  Benhaim, Misha Bilenko, Johan Bjorck, Sébastien Bubeck, Martin Cai, Qin Cai,
+  Vishrav Chaudhary, Dong Chen, Dongdong Chen, and 110 others. 2024.
+\newblock \href {https://arxiv.org/abs/2404.14219} {Phi-3 technical report: A
+  highly capable language model locally on your phone}.
+\newblock \emph{Preprint}, arXiv:2404.14219.
+
+\bibitem[{Bai et~al.(2022)Bai, Kadavath, Kundu, Askell, Kernion, Jones, Chen,
+  Goldie, Mirhoseini, McKinnon, Chen, Olsson, Olah, Hernandez, Drain, Ganguli,
+  Li, Tran-Johnson, Perez, Kerr, Mueller, Ladish, Landau, Ndousse, Lukosuite,
+  Lovitt, Sellitto, Elhage, Schiefer, Mercado, DasSarma, Lasenby, Larson,
+  Ringer, Johnston, Kravec, Showk, Fort, Lanham, Telleen-Lawton, Conerly,
+  Henighan, Hume, Bowman, Hatfield-Dodds, Mann, Amodei, Joseph, McCandlish,
+  Brown, and Kaplan}]{bai2022constitutional}
+Yuntao Bai, Saurav Kadavath, Sandipan Kundu, Amanda Askell, Jackson Kernion,
+  Andy Jones, Anna Chen, Anna Goldie, Azalia Mirhoseini, Cameron McKinnon,
+  Carol Chen, Catherine Olsson, Christopher Olah, Danny Hernandez, Dawn Drain,
+  Deep Ganguli, Dustin Li, Eli Tran-Johnson, Ethan Perez, and 32 others. 2022.
+\newblock \href {https://arxiv.org/abs/2212.08073} {Constitutional ai:
+  Harmlessness from ai feedback}.
+\newblock \emph{Preprint}, arXiv:2212.08073.
+
+\bibitem[{Burns et~al.(2023)Burns, Izmailov, Kirchner, Baker, Gao,
+  Aschenbrenner, Chen, Ecoffet, Joglekar, Leike, Sutskever, and
+  Wu}]{burns2023weakto}
+Collin Burns, Pavel Izmailov, Jan~Hendrik Kirchner, Bowen Baker, Leo Gao,
+  Leopold Aschenbrenner, Yining Chen, Adrien Ecoffet, Manas Joglekar, Jan
+  Leike, Ilya Sutskever, and Jeff Wu. 2023.
+\newblock \href {https://arxiv.org/abs/2312.09390} {Weak-to-strong
+  generalization: Eliciting strong capabilities with weak supervision}.
+\newblock \emph{Preprint}, arXiv:2312.09390.
+
+\bibitem[{Chuang et~al.(2024)Chuang, Xing, Chang, Liu, Chen, and
+  Hu}]{chuang2024learningcompresspromptnatural}
+Yu-Neng Chuang, Tianwei Xing, Chia-Yuan Chang, Zirui Liu, Xun Chen, and Xia Hu.
+  2024.
+\newblock \href {https://arxiv.org/abs/2402.18700} {Learning to compress prompt
+  in natural language formats}.
+\newblock \emph{Preprint}, arXiv:2402.18700.
+
+\bibitem[{Debenedetti et~al.(2024)Debenedetti, Zhang, Balunović,
+  Beurer-Kellner, Fischer, and Tramèr}]{ruan2024agentdojo}
+Edoardo Debenedetti, Jie Zhang, Mislav Balunović, Luca Beurer-Kellner, Marc
+  Fischer, and Florian Tramèr. 2024.
+\newblock \href {https://arxiv.org/abs/2406.13352} {Agentdojo: A dynamic
+  environment to evaluate prompt injection attacks and defenses for llm
+  agents}.
+\newblock \emph{Preprint}, arXiv:2406.13352.
+
+\bibitem[{Fei et~al.(2025)Fei, Niu, Xie, Liu, Bai, and Han}]{fei2025ehpc}
+Weizhi Fei, Xueyan Niu, Guoqing Xie, Yingqing Liu, Bo~Bai, and Wei Han. 2025.
+\newblock \href {https://arxiv.org/abs/2501.12959} {Efficient prompt
+  compression with evaluator heads for long-context transformer inference}.
+\newblock \emph{Preprint}, arXiv:2501.12959.
+
+\bibitem[{Ge et~al.(2024)Ge, Hu, Wang, Wang, Chen, and Wei}]{ge2024icae}
+Tao Ge, Jing Hu, Lei Wang, Xun Wang, Si-Qing Chen, and Furu Wei. 2024.
+\newblock \href {https://arxiv.org/abs/2307.06945} {In-context autoencoder for
+  context compression in a large language model}.
+\newblock \emph{Preprint}, arXiv:2307.06945.
+
+\bibitem[{Grattafiori et~al.(2024)Grattafiori, Dubey, Jauhri, Pandey, Kadian,
+  Al-Dahle, Letman, Mathur, Schelten, Vaughan, Yang, Fan, Goyal, Hartshorn,
+  Yang, Mitra, Sravankumar, Korenev, Hinsvark, Rao, Zhang, Rodriguez,
+  Gregerson, Spataru, Roziere, Biron, Tang, Chern, Caucheteux, Nayak, Bi,
+  Marra, McConnell, Keller, Touret, Wu, Wong, Ferrer, Nikolaidis, Allonsius,
+  Song, Pintz, Livshits, Wyatt, Esiobu, Choudhary, Mahajan, Garcia-Olano,
+  Perino, Hupkes, Lakomkin, AlBadawy, Lobanova, Dinan, Smith, Radenovic,
+  Guzmán, Zhang, Synnaeve, Lee, Anderson, Thattai, Nail, Mialon, Pang,
+  Cucurell, Nguyen, Korevaar, Xu, Touvron, Zarov, Ibarra, Kloumann, Misra,
+  Evtimov, Zhang, Copet, Lee, Geffert, Vranes, Park, Mahadeokar, Shah, van~der
+  Linde, Billock, Hong, Lee, Fu, Chi, Huang, Liu, Wang, Yu, Bitton, Spisak,
+  Park, Rocca, Johnstun, Saxe, Jia, Alwala, Prasad, Upasani, Plawiak, Li,
+  Heafield, Stone, El-Arini, Iyer, Malik, Chiu, Bhalla, Lakhotia,
+  Rantala-Yeary, van~der Maaten, Chen, Tan, Jenkins, Martin, Madaan, Malo,
+  Blecher, Landzaat, de~Oliveira, Muzzi, Pasupuleti, Singh, Paluri, Kardas,
+  Tsimpoukelli, Oldham, Rita, Pavlova, Kambadur, Lewis, Si, Singh, Hassan,
+  Goyal, Torabi, Bashlykov, Bogoychev, Chatterji, Zhang, Duchenne, Çelebi,
+  Alrassy, Zhang, Li, Vasic, Weng, Bhargava, Dubal, Krishnan, Koura, Xu, He,
+  Dong, Srinivasan, Ganapathy, Calderer, Cabral, Stojnic, Raileanu, Maheswari,
+  Girdhar, Patel, Sauvestre, Polidoro, Sumbaly, Taylor, Silva, Hou, Wang,
+  Hosseini, Chennabasappa, Singh, Bell, Kim, Edunov, Nie, Narang, Raparthy,
+  Shen, Wan, Bhosale, Zhang, Vandenhende, Batra, Whitman, Sootla, Collot,
+  Gururangan, Borodinsky, Herman, Fowler, Sheasha, Georgiou, Scialom,
+  Speckbacher, Mihaylov, Xiao, Karn, Goswami, Gupta, Ramanathan, Kerkez,
+  Gonguet, Do, Vogeti, Albiero, Petrovic, Chu, Xiong, Fu, Meers, Martinet,
+  Wang, Wang, Tan, Xia, Xie, Jia, Wang, Goldschlag, Gaur, Babaei, Wen, Song,
+  Zhang, Li, Mao, Coudert, Yan, Chen, Papakipos, Singh, Srivastava, Jain,
+  Kelsey, Shajnfeld, Gangidi, Victoria, Goldstand, Menon, Sharma, Boesenberg,
+  Baevski, Feinstein, Kallet, Sangani, Teo, Yunus, Lupu, Alvarado, Caples, Gu,
+  Ho, Poulton, Ryan, Ramchandani, Dong, Franco, Goyal, Saraf, Chowdhury,
+  Gabriel, Bharambe, Eisenman, Yazdan, James, Maurer, Leonhardi, Huang, Loyd,
+  Paola, Paranjape, Liu, Wu, Ni, Hancock, Wasti, Spence, Stojkovic, Gamido,
+  Montalvo, Parker, Burton, Mejia, Liu, Wang, Kim, Zhou, Hu, Chu, Cai, Tindal,
+  Feichtenhofer, Gao, Civin, Beaty, Kreymer, Li, Adkins, Xu, Testuggine, David,
+  Parikh, Liskovich, Foss, Wang, Le, Holland, Dowling, Jamil, Montgomery,
+  Presani, Hahn, Wood, Le, Brinkman, Arcaute, Dunbar, Smothers, Sun, Kreuk,
+  Tian, Kokkinos, Ozgenel, Caggioni, Kanayet, Seide, Florez, Schwarz, Badeer,
+  Swee, Halpern, Herman, Sizov, Guangyi, Zhang, Lakshminarayanan, Inan,
+  Shojanazeri, Zou, Wang, Zha, Habeeb, Rudolph, Suk, Aspegren, Goldman, Zhan,
+  Damlaj, Molybog, Tufanov, Leontiadis, Veliche, Gat, Weissman, Geboski, Kohli,
+  Lam, Asher, Gaya, Marcus, Tang, Chan, Zhen, Reizenstein, Teboul, Zhong, Jin,
+  Yang, Cummings, Carvill, Shepard, McPhie, Torres, Ginsburg, Wang, Wu, U,
+  Saxena, Khandelwal, Zand, Matosich, Veeraraghavan, Michelena, Li, Jagadeesh,
+  Huang, Chawla, Huang, Chen, Garg, A, Silva, Bell, Zhang, Guo, Yu, Moshkovich,
+  Wehrstedt, Khabsa, Avalani, Bhatt, Mankus, Hasson, Lennie, Reso, Groshev,
+  Naumov, Lathi, Keneally, Liu, Seltzer, Valko, Restrepo, Patel, Vyatskov,
+  Samvelyan, Clark, Macey, Wang, Hermoso, Metanat, Rastegari, Bansal,
+  Santhanam, Parks, White, Bawa, Singhal, Egebo, Usunier, Mehta, Laptev, Dong,
+  Cheng, Chernoguz, Hart, Salpekar, Kalinli, Kent, Parekh, Saab, Balaji,
+  Rittner, Bontrager, Roux, Dollar, Zvyagina, Ratanchandani, Yuvraj, Liang,
+  Alao, Rodriguez, Ayub, Murthy, Nayani, Mitra, Parthasarathy, Li, Hogan,
+  Battey, Wang, Howes, Rinott, Mehta, Siby, Bondu, Datta, Chugh, Hunt, Dhillon,
+  Sidorov, Pan, Mahajan, Verma, Yamamoto, Ramaswamy, Lindsay, Lindsay, Feng,
+  Lin, Zha, Patil, Shankar, Zhang, Zhang, Wang, Agarwal, Sajuyigbe, Chintala,
+  Max, Chen, Kehoe, Satterfield, Govindaprasad, Gupta, Deng, Cho, Virk,
+  Subramanian, Choudhury, Goldman, Remez, Glaser, Best, Koehler, Robinson, Li,
+  Zhang, Matthews, Chou, Shaked, Vontimitta, Ajayi, Montanez, Mohan, Kumar,
+  Mangla, Ionescu, Poenaru, Mihailescu, Ivanov, Li, Wang, Jiang, Bouaziz,
+  Constable, Tang, Wu, Wang, Wu, Gao, Kleinman, Chen, Hu, Jia, Qi, Li, Zhang,
+  Zhang, Adi, Nam, Yu, Wang, Zhao, Hao, Qian, Li, He, Rait, DeVito, Rosnbrick,
+  Wen, Yang, Zhao, and Ma}]{dubey2024llama}
+Aaron Grattafiori, Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey, Abhishek
+  Kadian, Ahmad Al-Dahle, Aiesha Letman, Akhil Mathur, Alan Schelten, Alex
+  Vaughan, Amy Yang, Angela Fan, Anirudh Goyal, Anthony Hartshorn, Aobo Yang,
+  Archi Mitra, Archie Sravankumar, Artem Korenev, Arthur Hinsvark, and 542
+  others. 2024.
+\newblock \href {https://arxiv.org/abs/2407.21783} {The llama 3 herd of
+  models}.
+\newblock \emph{Preprint}, arXiv:2407.21783.
+
+\bibitem[{Inan et~al.(2023)Inan, Upasani, Chi, Rungta, Iyer, Mao, Tontchev, Hu,
+  Fuller, Testuggine, and Khabsa}]{inan2023llamaguard}
+Hakan Inan, Kartikeya Upasani, Jianfeng Chi, Rashi Rungta, Krithika Iyer,
+  Yuning Mao, Michael Tontchev, Qing Hu, Brian Fuller, Davide Testuggine, and
+  Madian Khabsa. 2023.
+\newblock \href {https://arxiv.org/abs/2312.06674} {Llama guard: Llm-based
+  input-output safeguard for human-ai conversations}.
+\newblock \emph{Preprint}, arXiv:2312.06674.
+
+\bibitem[{Jiang et~al.(2023)Jiang, Wu, Lin, Yang, and Qiu}]{jiang2023llmlingua}
+Huiqiang Jiang, Qianhui Wu, Chin-Yew Lin, Yuqing Yang, and Lili Qiu. 2023.
+\newblock \href {https://arxiv.org/abs/2310.05736} {Llmlingua: Compressing
+  prompts for accelerated inference of large language models}.
+\newblock \emph{Preprint}, arXiv:2310.05736.
+
+\bibitem[{Liskavets et~al.(2024)Liskavets, Ushakov, Roy, Klibanov, Etemad, and
+  Luke}]{liskavets2025cpc}
+Barys Liskavets, Maxim Ushakov, Shuvendu Roy, Mark Klibanov, Ali Etemad, and
+  Shane Luke. 2024.
+\newblock \href {https://arxiv.org/abs/2409.01227} {Prompt compression with
+  context-aware sentence encoding for fast and improved llm inference}.
+\newblock \emph{Preprint}, arXiv:2409.01227.
+
+\bibitem[{Liu et~al.(2023)Liu, Lin, Hewitt, Paranjape, Bevilacqua, Petroni, and
+  Liang}]{liu2023lostinthemiddle}
+Nelson~F. Liu, Kevin Lin, John Hewitt, Ashwin Paranjape, Michele Bevilacqua,
+  Fabio Petroni, and Percy Liang. 2023.
+\newblock \href {https://arxiv.org/abs/2307.03172} {Lost in the middle: How
+  language models use long contexts}.
+\newblock \emph{Preprint}, arXiv:2307.03172.
+
+\bibitem[{Mazeika et~al.(2024)Mazeika, Phan, Yin, Zou, Wang, Mu, Sakhaee, Li,
+  Basart, Li, Forsyth, and Hendrycks}]{mazeika2024harmbench}
+Mantas Mazeika, Long Phan, Xuwang Yin, Andy Zou, Zifan Wang, Norman Mu, Elham
+  Sakhaee, Nathaniel Li, Steven Basart, Bo~Li, David Forsyth, and Dan
+  Hendrycks. 2024.
+\newblock \href {https://arxiv.org/abs/2402.04249} {Harmbench: A standardized
+  evaluation framework for automated red teaming and robust refusal}.
+\newblock \emph{Preprint}, arXiv:2402.04249.
+
+\bibitem[{Pan et~al.(2024)Pan, Wu, Jiang, Xia, Luo, Zhang, Lin, Rühle, Yang,
+  Lin, Zhao, Qiu, and Zhang}]{pan2024llmlingua2}
+Zhuoshi Pan, Qianhui Wu, Huiqiang Jiang, Menglin Xia, Xufang Luo, Jue Zhang,
+  Qingwei Lin, Victor Rühle, Yuqing Yang, Chin-Yew Lin, H.~Vicky Zhao, Lili
+  Qiu, and Dongmei Zhang. 2024.
+\newblock \href {https://arxiv.org/abs/2403.12968} {Llmlingua-2: Data
+  distillation for efficient and faithful task-agnostic prompt compression}.
+\newblock \emph{Preprint}, arXiv:2403.12968.
+
+\bibitem[{Team et~al.(2024)Team, Mesnard, Hardin, Dadashi, Bhupatiraju, Pathak,
+  Sifre, Rivière, Kale, Love, Tafti, Hussenot, Sessa, Chowdhery, Roberts,
+  Barua, Botev, Castro-Ros, Slone, Héliou, Tacchetti, Bulanova, Paterson,
+  Tsai, Shahriari, Lan, Choquette-Choo, Crepy, Cer, Ippolito, Reid,
+  Buchatskaya, Ni, Noland, Yan, Tucker, Muraru, Rozhdestvenskiy, Michalewski,
+  Tenney, Grishchenko, Austin, Keeling, Labanowski, Lespiau, Stanway, Brennan,
+  Chen, Ferret, Chiu, Mao-Jones, Lee, Yu, Millican, Sjoesund, Lee, Dixon, Reid,
+  Mikuła, Wirth, Sharman, Chinaev, Thain, Bachem, Chang, Wahltinez, Bailey,
+  Michel, Yotov, Chaabouni, Comanescu, Jana, Anil, McIlroy, Liu, Mullins,
+  Smith, Borgeaud, Girgin, Douglas, Pandya, Shakeri, De, Klimenko, Hennigan,
+  Feinberg, Stokowiec, hui Chen, Ahmed, Gong, Warkentin, Peran, Giang, Farabet,
+  Vinyals, Dean, Kavukcuoglu, Hassabis, Ghahramani, Eck, Barral, Pereira,
+  Collins, Joulin, Fiedel, Senter, Andreev, and Kenealy}]{team2024gemma}
+Gemma Team, Thomas Mesnard, Cassidy Hardin, Robert Dadashi, Surya Bhupatiraju,
+  Shreya Pathak, Laurent Sifre, Morgane Rivière, Mihir~Sanjay Kale, Juliette
+  Love, Pouya Tafti, Léonard Hussenot, Pier~Giuseppe Sessa, Aakanksha
+  Chowdhery, Adam Roberts, Aditya Barua, Alex Botev, Alex Castro-Ros, Ambrose
+  Slone, and 89 others. 2024.
+\newblock \href {https://arxiv.org/abs/2403.08295} {Gemma: Open models based on
+  gemini research and technology}.
+\newblock \emph{Preprint}, arXiv:2403.08295.
+
+\bibitem[{Zhao et~al.(2025)Zhao, Wu, and Xu}]{zhao2025attncomp}
+Yunlong Zhao, Haoran Wu, and Bo~Xu. 2025.
+\newblock \href {https://doi.org/10.1609/aaai.v39i24.34800} {Leveraging
+  attention to effectively compress prompts for long-context llms}.
+\newblock \emph{Proceedings of the AAAI Conference on Artificial Intelligence},
+  39(24):26048--26056.
+
+\end{thebibliography}

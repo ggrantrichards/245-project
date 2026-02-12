@@ -1,0 +1,12 @@
+{
+  "compression_rate": 0.7,
+  "total_samples": 10,
+  "stats": {
+    "tp": 0,
+    "fn": 0,
+    "fp": 9,
+    "tn": 1
+  },
+  "unsafe_pass_through_rate": 0,
+  "benign_refusal_rate": 0.9
+}

@@ -6,7 +6,8 @@ from datasets import load_dataset
 import logging
 import json
 import os
-import gc 
+import gc
+import argparse
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
@@ -150,8 +151,8 @@ class SafetyCritic:
         
         return "unsafe" if "unsafe" in result.lower() else "safe"
 
-def run_pipeline():
-    COMPRESSION_RATE = 0.5
+def run_pipeline(compression_rate=0.5, limit=10, save_results=False):
+    COMPRESSION_RATE = compression_rate
     
     # Garbage collection before start
     torch.cuda.empty_cache() if torch.cuda.is_available() else None
@@ -159,7 +160,7 @@ def run_pipeline():
     
     # Initialize
     try:
-        loader = AgentDojoLoader(limit=10)
+        loader = AgentDojoLoader(limit=limit)
         compressor = EntropyCompressor()
         critic = SafetyCritic()
     except Exception as e:
@@ -204,6 +205,44 @@ def run_pipeline():
     refusal_denom = stats['fp'] + stats['tn']
     brr = stats['fp'] / refusal_denom if refusal_denom > 0 else 0
     logger.info(f"Benign Refusal Rate: {brr:.2%}")
+    
+    # Save results to JSON if requested
+    if save_results:
+        results = {
+            "compression_rate": COMPRESSION_RATE,
+            "total_samples": total_samples,
+            "stats": stats,
+            "unsafe_pass_through_rate": asr,
+            "benign_refusal_rate": brr
+        }
+        os.makedirs("results", exist_ok=True)
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"results/results_compression_{COMPRESSION_RATE:.2f}_{timestamp}.json"
+        with open(filename, 'w') as f:
+            json.dump(results, f, indent=2)
+        logger.info(f"\nResults saved to: {filename}")
+    
+    return {"asr": asr, "brr": brr, "stats": stats}
 
 if __name__ == "__main__":
-    run_pipeline()
+    parser = argparse.ArgumentParser(description='Run safety-preserving compression pipeline')
+    parser.add_argument('--compression', type=float, default=0.5, 
+                        help='Compression ratio (0.0 = no compression, 1.0 = maximum compression)')
+    parser.add_argument('--limit', type=int, default=10,
+                        help='Number of samples to process from dataset')
+    parser.add_argument('--save', action='store_true',
+                        help='Save results to JSON file')
+    
+    args = parser.parse_args()
+    
+    # Validate compression ratio
+    if not 0.0 <= args.compression <= 1.0:
+        logger.error("Compression ratio must be between 0.0 and 1.0")
+        exit(1)
+    
+    run_pipeline(
+        compression_rate=args.compression,
+        limit=args.limit,
+        save_results=args.save
+    )

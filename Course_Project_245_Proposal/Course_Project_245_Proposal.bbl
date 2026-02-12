@@ -1,0 +1,136 @@
+\begin{thebibliography}{4}
+\providecommand{\natexlab}[1]{#1}
+
+\bibitem[{Abdin et~al.(2024)Abdin, Aneja, Awadalla, Awadallah, Awan, Bach,
+  Bahree, Bakhtiari, Bao, Behl, Benhaim, Bilenko, Bjorck, Bubeck, Cai, Cai,
+  Chaudhary, Chen, Chen, Chen, Chen, Chen, Cheng, Chopra, Dai, Dixon, Eldan,
+  Fragoso, Gao, Gao, Gao, Garg, Giorno, Goswami, Gunasekar, Haider, Hao,
+  Hewett, Hu, Huynh, Iter, Jacobs, Javaheripi, Jin, Karampatziakis, Kauffmann,
+  Khademi, Kim, Kim, Kurilenko, Lee, Lee, Li, Li, Liang, Liden, Lin, Lin, Liu,
+  Liu, Liu, Liu, Liu, Luo, Madan, Mahmoudzadeh, Majercak, Mazzola, Mendes,
+  Mitra, Modi, Nguyen, Norick, Patra, Perez-Becker, Portet, Pryzant, Qin,
+  Radmilac, Ren, de~Rosa, Rosset, Roy, Ruwase, Saarikivi, Saied, Salim,
+  Santacroce, Shah, Shang, Sharma, Shen, Shukla, Song, Tanaka, Tupini,
+  Vaddamanu, Wang, Wang, Wang, Wang, Wang, Wang, Ward, Wen, Witte, Wu, Wu,
+  Wyatt, Xiao, Xu, Xu, Xu, Xue, Yadav, Yang, Yang, Yang, Yang, Yu, Yuan, Zhang,
+  Zhang, Zhang, Zhang, Zhang, Zhang, Zhang, and
+  Zhou}]{abdin2024phi3technicalreporthighly}
+Marah Abdin, Jyoti Aneja, Hany Awadalla, Ahmed Awadallah, Ammar~Ahmad Awan,
+  Nguyen Bach, Amit Bahree, Arash Bakhtiari, Jianmin Bao, Harkirat Behl, Alon
+  Benhaim, Misha Bilenko, Johan Bjorck, Sébastien Bubeck, Martin Cai, Qin Cai,
+  Vishrav Chaudhary, Dong Chen, Dongdong Chen, and 110 others. 2024.
+\newblock \href {https://arxiv.org/abs/2404.14219} {Phi-3 technical report: A
+  highly capable language model locally on your phone}.
+\newblock \emph{Preprint}, arXiv:2404.14219.
+
+\bibitem[{Grattafiori et~al.(2024)Grattafiori, Dubey, Jauhri, Pandey, Kadian,
+  Al-Dahle, Letman, Mathur, Schelten, Vaughan, Yang, Fan, Goyal, Hartshorn,
+  Yang, Mitra, Sravankumar, Korenev, Hinsvark, Rao, Zhang, Rodriguez,
+  Gregerson, Spataru, Roziere, Biron, Tang, Chern, Caucheteux, Nayak, Bi,
+  Marra, McConnell, Keller, Touret, Wu, Wong, Ferrer, Nikolaidis, Allonsius,
+  Song, Pintz, Livshits, Wyatt, Esiobu, Choudhary, Mahajan, Garcia-Olano,
+  Perino, Hupkes, Lakomkin, AlBadawy, Lobanova, Dinan, Smith, Radenovic,
+  Guzmán, Zhang, Synnaeve, Lee, Anderson, Thattai, Nail, Mialon, Pang,
+  Cucurell, Nguyen, Korevaar, Xu, Touvron, Zarov, Ibarra, Kloumann, Misra,
+  Evtimov, Zhang, Copet, Lee, Geffert, Vranes, Park, Mahadeokar, Shah, van~der
+  Linde, Billock, Hong, Lee, Fu, Chi, Huang, Liu, Wang, Yu, Bitton, Spisak,
+  Park, Rocca, Johnstun, Saxe, Jia, Alwala, Prasad, Upasani, Plawiak, Li,
+  Heafield, Stone, El-Arini, Iyer, Malik, Chiu, Bhalla, Lakhotia,
+  Rantala-Yeary, van~der Maaten, Chen, Tan, Jenkins, Martin, Madaan, Malo,
+  Blecher, Landzaat, de~Oliveira, Muzzi, Pasupuleti, Singh, Paluri, Kardas,
+  Tsimpoukelli, Oldham, Rita, Pavlova, Kambadur, Lewis, Si, Singh, Hassan,
+  Goyal, Torabi, Bashlykov, Bogoychev, Chatterji, Zhang, Duchenne, Çelebi,
+  Alrassy, Zhang, Li, Vasic, Weng, Bhargava, Dubal, Krishnan, Koura, Xu, He,
+  Dong, Srinivasan, Ganapathy, Calderer, Cabral, Stojnic, Raileanu, Maheswari,
+  Girdhar, Patel, Sauvestre, Polidoro, Sumbaly, Taylor, Silva, Hou, Wang,
+  Hosseini, Chennabasappa, Singh, Bell, Kim, Edunov, Nie, Narang, Raparthy,
+  Shen, Wan, Bhosale, Zhang, Vandenhende, Batra, Whitman, Sootla, Collot,
+  Gururangan, Borodinsky, Herman, Fowler, Sheasha, Georgiou, Scialom,
+  Speckbacher, Mihaylov, Xiao, Karn, Goswami, Gupta, Ramanathan, Kerkez,
+  Gonguet, Do, Vogeti, Albiero, Petrovic, Chu, Xiong, Fu, Meers, Martinet,
+  Wang, Wang, Tan, Xia, Xie, Jia, Wang, Goldschlag, Gaur, Babaei, Wen, Song,
+  Zhang, Li, Mao, Coudert, Yan, Chen, Papakipos, Singh, Srivastava, Jain,
+  Kelsey, Shajnfeld, Gangidi, Victoria, Goldstand, Menon, Sharma, Boesenberg,
+  Baevski, Feinstein, Kallet, Sangani, Teo, Yunus, Lupu, Alvarado, Caples, Gu,
+  Ho, Poulton, Ryan, Ramchandani, Dong, Franco, Goyal, Saraf, Chowdhury,
+  Gabriel, Bharambe, Eisenman, Yazdan, James, Maurer, Leonhardi, Huang, Loyd,
+  Paola, Paranjape, Liu, Wu, Ni, Hancock, Wasti, Spence, Stojkovic, Gamido,
+  Montalvo, Parker, Burton, Mejia, Liu, Wang, Kim, Zhou, Hu, Chu, Cai, Tindal,
+  Feichtenhofer, Gao, Civin, Beaty, Kreymer, Li, Adkins, Xu, Testuggine, David,
+  Parikh, Liskovich, Foss, Wang, Le, Holland, Dowling, Jamil, Montgomery,
+  Presani, Hahn, Wood, Le, Brinkman, Arcaute, Dunbar, Smothers, Sun, Kreuk,
+  Tian, Kokkinos, Ozgenel, Caggioni, Kanayet, Seide, Florez, Schwarz, Badeer,
+  Swee, Halpern, Herman, Sizov, Guangyi, Zhang, Lakshminarayanan, Inan,
+  Shojanazeri, Zou, Wang, Zha, Habeeb, Rudolph, Suk, Aspegren, Goldman, Zhan,
+  Damlaj, Molybog, Tufanov, Leontiadis, Veliche, Gat, Weissman, Geboski, Kohli,
+  Lam, Asher, Gaya, Marcus, Tang, Chan, Zhen, Reizenstein, Teboul, Zhong, Jin,
+  Yang, Cummings, Carvill, Shepard, McPhie, Torres, Ginsburg, Wang, Wu, U,
+  Saxena, Khandelwal, Zand, Matosich, Veeraraghavan, Michelena, Li, Jagadeesh,
+  Huang, Chawla, Huang, Chen, Garg, A, Silva, Bell, Zhang, Guo, Yu, Moshkovich,
+  Wehrstedt, Khabsa, Avalani, Bhatt, Mankus, Hasson, Lennie, Reso, Groshev,
+  Naumov, Lathi, Keneally, Liu, Seltzer, Valko, Restrepo, Patel, Vyatskov,
+  Samvelyan, Clark, Macey, Wang, Hermoso, Metanat, Rastegari, Bansal,
+  Santhanam, Parks, White, Bawa, Singhal, Egebo, Usunier, Mehta, Laptev, Dong,
+  Cheng, Chernoguz, Hart, Salpekar, Kalinli, Kent, Parekh, Saab, Balaji,
+  Rittner, Bontrager, Roux, Dollar, Zvyagina, Ratanchandani, Yuvraj, Liang,
+  Alao, Rodriguez, Ayub, Murthy, Nayani, Mitra, Parthasarathy, Li, Hogan,
+  Battey, Wang, Howes, Rinott, Mehta, Siby, Bondu, Datta, Chugh, Hunt, Dhillon,
+  Sidorov, Pan, Mahajan, Verma, Yamamoto, Ramaswamy, Lindsay, Lindsay, Feng,
+  Lin, Zha, Patil, Shankar, Zhang, Zhang, Wang, Agarwal, Sajuyigbe, Chintala,
+  Max, Chen, Kehoe, Satterfield, Govindaprasad, Gupta, Deng, Cho, Virk,
+  Subramanian, Choudhury, Goldman, Remez, Glaser, Best, Koehler, Robinson, Li,
+  Zhang, Matthews, Chou, Shaked, Vontimitta, Ajayi, Montanez, Mohan, Kumar,
+  Mangla, Ionescu, Poenaru, Mihailescu, Ivanov, Li, Wang, Jiang, Bouaziz,
+  Constable, Tang, Wu, Wang, Wu, Gao, Kleinman, Chen, Hu, Jia, Qi, Li, Zhang,
+  Zhang, Adi, Nam, Yu, Wang, Zhao, Hao, Qian, Li, He, Rait, DeVito, Rosnbrick,
+  Wen, Yang, Zhao, and Ma}]{grattafiori2024llama3herdmodels}
+Aaron Grattafiori, Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey, Abhishek
+  Kadian, Ahmad Al-Dahle, Aiesha Letman, Akhil Mathur, Alan Schelten, Alex
+  Vaughan, Amy Yang, Angela Fan, Anirudh Goyal, Anthony Hartshorn, Aobo Yang,
+  Archi Mitra, Archie Sravankumar, Artem Korenev, Arthur Hinsvark, and 542
+  others. 2024.
+\newblock \href {https://arxiv.org/abs/2407.21783} {The llama 3 herd of
+  models}.
+\newblock \emph{Preprint}, arXiv:2407.21783.
+
+\bibitem[{Jiang et~al.(2023)Jiang, Wu, Lin, Yang, and
+  Qiu}]{jiang2023llmlinguacompressingpromptsaccelerated}
+Huiqiang Jiang, Qianhui Wu, Chin-Yew Lin, Yuqing Yang, and Lili Qiu. 2023.
+\newblock \href {https://arxiv.org/abs/2310.05736} {Llmlingua: Compressing
+  prompts for accelerated inference of large language models}.
+\newblock \emph{Preprint}, arXiv:2310.05736.
+
+\bibitem[{Team et~al.(2024)Team, Riviere, Pathak, Sessa, Hardin, Bhupatiraju,
+  Hussenot, Mesnard, Shahriari, Ramé, Ferret, Liu, Tafti, Friesen, Casbon,
+  Ramos, Kumar, Lan, Jerome, Tsitsulin, Vieillard, Stanczyk, Girgin, Momchev,
+  Hoffman, Thakoor, Grill, Neyshabur, Bachem, Walton, Severyn, Parrish, Ahmad,
+  Hutchison, Abdagic, Carl, Shen, Brock, Coenen, Laforge, Paterson, Bastian,
+  Piot, Wu, Royal, Chen, Kumar, Perry, Welty, Choquette-Choo, Sinopalnikov,
+  Weinberger, Vijaykumar, Rogozińska, Herbison, Bandy, Wang, Noland, Moreira,
+  Senter, Eltyshev, Visin, Rasskin, Wei, Cameron, Martins, Hashemi,
+  Klimczak-Plucińska, Batra, Dhand, Nardini, Mein, Zhou, Svensson, Stanway,
+  Chan, Zhou, Carrasqueira, Iljazi, Becker, Fernandez, van Amersfoort, Gordon,
+  Lipschultz, Newlan, yeong Ji, Mohamed, Badola, Black, Millican, McDonell,
+  Nguyen, Sodhia, Greene, Sjoesund, Usui, Sifre, Heuermann, Lago, McNealus,
+  Soares, Kilpatrick, Dixon, Martins, Reid, Singh, Iverson, Görner, Velloso,
+  Wirth, Davidow, Miller, Rahtz, Watson, Risdal, Kazemi, Moynihan, Zhang,
+  Kahng, Park, Rahman, Khatwani, Dao, Bardoliwalla, Devanathan, Dumai, Chauhan,
+  Wahltinez, Botarda, Barnes, Barham, Michel, Jin, Georgiev, Culliton, Kuppala,
+  Comanescu, Merhej, Jana, Rokni, Agarwal, Mullins, Saadat, Carthy, Cogan,
+  Perrin, Arnold, Krause, Dai, Garg, Sheth, Ronstrom, Chan, Jordan, Yu, Eccles,
+  Hennigan, Kocisky, Doshi, Jain, Yadav, Meshram, Dharmadhikari, Barkley, Wei,
+  Ye, Han, Kwon, Xu, Shen, Gong, Wei, Cotruta, Kirk, Rao, Giang, Peran,
+  Warkentin, Collins, Barral, Ghahramani, Hadsell, Sculley, Banks, Dragan,
+  Petrov, Vinyals, Dean, Hassabis, Kavukcuoglu, Farabet, Buchatskaya, Borgeaud,
+  Fiedel, Joulin, Kenealy, Dadashi, and
+  Andreev}]{gemmateam2024gemma2improvingopen}
+Gemma Team, Morgane Riviere, Shreya Pathak, Pier~Giuseppe Sessa, Cassidy
+  Hardin, Surya Bhupatiraju, Léonard Hussenot, Thomas Mesnard, Bobak
+  Shahriari, Alexandre Ramé, Johan Ferret, Peter Liu, Pouya Tafti, Abe
+  Friesen, Michelle Casbon, Sabela Ramos, Ravin Kumar, Charline~Le Lan, Sammy
+  Jerome, and 179 others. 2024.
+\newblock \href {https://arxiv.org/abs/2408.00118} {Gemma 2: Improving open
+  language models at a practical size}.
+\newblock \emph{Preprint}, arXiv:2408.00118.
+
+\end{thebibliography}
