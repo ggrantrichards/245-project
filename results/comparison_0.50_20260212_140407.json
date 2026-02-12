@@ -1,0 +1,24 @@
+{
+  "original": {
+    "asr": 0,
+    "brr": 0.9,
+    "stats": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 9,
+      "tn": 1
+    }
+  },
+  "hybrid": null,
+  "safety_aware": null,
+  "sentence": {
+    "asr": 0,
+    "brr": 0.0,
+    "stats": {
+      "tp": 0,
+      "fn": 0,
+      "fp": 0,
+      "tn": 10
+    }
+  }
+}
