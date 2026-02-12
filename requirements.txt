@@ -1,6 +1,8 @@
 torch
 transformers
+datasets
 accelerate
+bitsandbytes
 numpy
 tqdm
 scipy

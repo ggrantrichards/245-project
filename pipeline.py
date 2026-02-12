@@ -4,6 +4,8 @@ from torch.nn import CrossEntropyLoss
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
 import logging
+import json
+import os
 import gc 
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -21,52 +23,52 @@ DEVICE = get_device()
 
 class AgentDojoLoader:
     def __init__(self, limit=50):
-        logger.info("Loading Dataset: Genteki/agentdojo_tiny...")
-        try:
+        # Path to the local file in your repo
+        self.local_path = "data/agentdojo_tiny.json"
+        
+        if os.path.exists(self.local_path):
+            logger.info(f"Loading Dataset from local file: {self.local_path}")
+            with open(self.local_path, 'r') as f:
+                # Load JSONL format (one JSON object per line)
+                self.dataset = [json.loads(line) for line in f]
+        else:
+            logger.warning(f"⚠️ Data file not found at {self.local_path}. Downloading from Hub...")
             self.dataset = load_dataset("Genteki/agentdojo_tiny", split="train")
-        except Exception as e:
-            logger.error(f"Failed to load dataset: {e}")
-            raise e
             
         self.limit = limit
         
         if len(self.dataset) > 0:
-            logger.info(f"Dataset Columns Found: {self.dataset.column_names}")
+            # Handle both HF Dataset objects and local lists of dicts
+            sample = self.dataset[0]
+            columns = list(sample.keys()) if isinstance(sample, dict) else self.dataset.column_names
+            logger.info(f"Dataset Columns Found: {columns}")
 
     def format_trace(self, example) -> str:
-        # 1. Grab the direct content from detected columns
+        # Pulls from the specific 'tiny' schema detected earlier
         system = example.get('system_prompt', '')
         user_input = example.get('prompt', '')
-        
-        # 2. Check for the history list
         history = example.get('conversation') or example.get('history') or []
         
-        # 3. Build the trace starting with known valid columns
         trace_parts = []
         if system: trace_parts.append(f"[SYSTEM]: {system}")
         if user_input: trace_parts.append(f"[USER]: {user_input}")
         
-        # 4. Append history only if it's a valid list and not empty
         if isinstance(history, list) and len(history) > 0:
             for turn in history:
                 if isinstance(turn, dict):
                     role = turn.get('role', 'unknown').upper()
                     content = turn.get('content', '')
                     trace_parts.append(f"[{role}]: {content}")
-                else:
-                    trace_parts.append(str(turn))
-                    
         return "\n".join(trace_parts)
 
     def __iter__(self):
-        count = 0
-        for example in self.dataset:
+        for count, example in enumerate(self.dataset):
             if count >= self.limit:
                 break
             
             trace = self.format_trace(example)
             
-            # Ground truth detection
+            # Identify ground truth safety labels
             is_unsafe = False
             if 'is_safe' in example:
                 is_unsafe = not example['is_safe']
@@ -75,11 +77,7 @@ class AgentDojoLoader:
             elif 'jailbreak' in example:
                 is_unsafe = example['jailbreak']
             
-            yield {
-                "trace": trace,
-                "is_unsafe": is_unsafe
-            }
-            count += 1
+            yield {"trace": trace, "is_unsafe": is_unsafe}
 
 class EntropyCompressor:
     def __init__(self, model_name="gpt2"):
