@@ -4,6 +4,7 @@ from torch.nn import CrossEntropyLoss
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
 import logging
+import gc 
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
@@ -33,21 +34,28 @@ class AgentDojoLoader:
             logger.info(f"Dataset Columns Found: {self.dataset.column_names}")
 
     def format_trace(self, example) -> str:
+        # 1. Grab the direct content from detected columns
+        system = example.get('system_prompt', '')
+        user_input = example.get('prompt', '')
+        
+        # 2. Check for the history list
         history = example.get('conversation') or example.get('history') or []
         
+        # 3. Build the trace starting with known valid columns
         trace_parts = []
-        if isinstance(history, list):
+        if system: trace_parts.append(f"[SYSTEM]: {system}")
+        if user_input: trace_parts.append(f"[USER]: {user_input}")
+        
+        # 4. Append history only if it's a valid list and not empty
+        if isinstance(history, list) and len(history) > 0:
             for turn in history:
-                # Handle dictionary items in the list
                 if isinstance(turn, dict):
-                    role = turn.get('role', 'unknown')
+                    role = turn.get('role', 'unknown').upper()
                     content = turn.get('content', '')
-                    trace_parts.append(f"[{role.upper()}]: {content}")
+                    trace_parts.append(f"[{role}]: {content}")
                 else:
                     trace_parts.append(str(turn))
-        else:
-            trace_parts.append(str(history))
-            
+                    
         return "\n".join(trace_parts)
 
     def __iter__(self):
@@ -59,13 +67,11 @@ class AgentDojoLoader:
             trace = self.format_trace(example)
             
             # Ground truth detection
-            # In 'tiny' datasets, the label is often 'is_safe', 'label', or 'jailbreak'
-            # We look for common indicators of unsafe traces
             is_unsafe = False
             if 'is_safe' in example:
                 is_unsafe = not example['is_safe']
             elif 'label' in example:
-                is_unsafe = (example['label'] == 1) # Assuming 1 is unsafe
+                is_unsafe = (example['label'] == 1) 
             elif 'jailbreak' in example:
                 is_unsafe = example['jailbreak']
             
@@ -79,6 +85,7 @@ class EntropyCompressor:
     def __init__(self, model_name="gpt2"):
         logger.info(f"Loading Compressor: {model_name}")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # Load GPT2 to standard device (it's small, ~0.5GB, so it's safe)
         self.model = AutoModelForCausalLM.from_pretrained(model_name).to(DEVICE)
         self.model.eval()
 
@@ -113,21 +120,17 @@ class EntropyCompressor:
 class SafetyCritic:
     def __init__(self, model_id="meta-llama/Llama-Guard-3-8B"):
         logger.info(f"Loading Critic: {model_id}")
+        logger.info("NOTE: Using automatic device mapping to prevent OOM crashes.")
+        
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
-            
-            # Mac (MPS) optimization: Avoid device_map="auto"
-            if DEVICE == "cuda":
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    model_id, 
-                    torch_dtype=torch.bfloat16, 
-                    device_map="auto"
-                )
-            else:
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    model_id, 
-                    torch_dtype=torch.bfloat16
-                ).to(DEVICE)
+
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_id, 
+                torch_dtype=torch.bfloat16, 
+                device_map="auto",
+                low_cpu_mem_usage=True
+            )
                 
         except Exception as e:
             logger.error("\n[ERROR] Llama Guard load failed.")
@@ -135,8 +138,11 @@ class SafetyCritic:
             raise e
 
     def evaluate(self, trace: str) -> str:
+        # Ensure inputs are on the same device as the model's first layer
+        model_device = self.model.device
+        
         chat = [{"role": "user", "content": trace}]
-        input_ids = self.tokenizer.apply_chat_template(chat, return_tensors="pt").to(DEVICE)
+        input_ids = self.tokenizer.apply_chat_template(chat, return_tensors="pt").to(model_device)
         
         with torch.no_grad():
             output = self.model.generate(input_ids, max_new_tokens=20, pad_token_id=0)
@@ -148,6 +154,10 @@ class SafetyCritic:
 
 def run_pipeline():
     COMPRESSION_RATE = 0.5
+    
+    # Garbage collection before start
+    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+    gc.collect()
     
     # Initialize
     try:
