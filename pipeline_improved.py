@@ -27,66 +27,83 @@ def get_device():
 DEVICE = get_device()
 
 class BalancedTraceLoader:
-    def __init__(self, dataset_path="ai-safety-institute/AgentHarm", limit=200):
-        self.local_path = "data/agentdojo_tiny.json"
+    def __init__(self, limit=200, min_words=50):
+        logger.info(f"Loading Balanced Dataset (AgentHarm) with target: {limit} (Min words: {min_words})")
         
-        # Restored local file loading logic
-        if os.path.exists(self.local_path):
-            logger.info(f"Loading Dataset from local file: {self.local_path} with Balanced Split target: {limit}")
-            with open(self.local_path, 'r') as f:
-                self.dataset = [json.loads(line) for line in f]
-        else:
-            logger.info(f"Loading Dataset from Hub: {dataset_path} with Balanced Split target: {limit}")
-            self.dataset = load_dataset(dataset_path, split="train")
+        target_per_class = limit // 2
+        
+        # Explicitly load and combine both splits to maximize sample size
+        try:
+            from datasets import concatenate_datasets
+            h_val = load_dataset('ai-safety-institute/AgentHarm', 'harmful', split='validation')
+            h_test = load_dataset('ai-safety-institute/AgentHarm', 'harmful', split='test_public')
+            harmful_ds = concatenate_datasets([h_val, h_test])
             
-        self.limit = limit
-        self.target_per_class = limit // 2  # e.g., 100 safe, 100 unsafe
+            b_val = load_dataset('ai-safety-institute/AgentHarm', 'harmless_benign', split='validation')
+            b_test = load_dataset('ai-safety-institute/AgentHarm', 'harmless_benign', split='test_public')
+            benign_ds = concatenate_datasets([b_val, b_test])
+        except Exception as e:
+            logger.error(f"Error loading datasets: {e}")
+            return
         
+        self.samples = []
+        
+        # 1. Process harmful (Unsafe) samples
+        unsafe_count = 0
+        for i in range(len(harmful_ds)):
+            trace = self.format_trace(harmful_ds[i])
+            if len(trace.split()) >= min_words:
+                self.samples.append({"trace": trace, "is_unsafe": True})
+                unsafe_count += 1
+            if unsafe_count >= target_per_class:
+                break
+            
+        # 2. Process benign (Safe) samples
+        safe_count = 0
+        for i in range(len(benign_ds)):
+            trace = self.format_trace(benign_ds[i])
+            if len(trace.split()) >= min_words:
+                self.samples.append({"trace": trace, "is_unsafe": False})
+                safe_count += 1
+            if safe_count >= target_per_class:
+                break
+            
+        import numpy as np
+        np.random.shuffle(self.samples)
+        logger.info(f"Final dataset: {len(self.samples)} samples ({unsafe_count} unsafe, {safe_count} safe).")
+
     def format_trace(self, example) -> str:
-        system = example.get('system_prompt', '')
-        user_input = example.get('prompt', '')
-        history = example.get('conversation') or example.get('history') or []
-        
+        """
+        Robust formatting to handle ATBench and AgentHarm schemas.
+        """
+        # Try multiple common keys for the dialogue history
+        msgs = example.get('conversation') or example.get('messages') or example.get('history') or []
         trace_parts = []
-        if system: trace_parts.append(f"[SYSTEM]: {system}")
-        if user_input: trace_parts.append(f"[USER]: {user_input}")
         
-        if isinstance(history, list):
-            for turn in history:
-                if isinstance(turn, dict):
-                    role = turn.get('role', 'unknown').upper()
-                    content = turn.get('content', '')
-                    trace_parts.append(f"[{role}]: {content}")
+        # Add system prompt and initial prompt if they exist
+        if example.get('system_prompt'):
+            trace_parts.append(f"[SYSTEM]: {example.get('system_prompt')}")
+        if example.get('prompt'):
+            trace_parts.append(f"[USER]: {example.get('prompt')}")
+        
+        for m in msgs:
+            role = m.get('role', 'unknown').upper()
+            content = m.get('content', '')
+            
+            # Handle embedded tool calls if they exist in the schema
+            tool_calls = m.get('tool_calls', [])
+            if tool_calls:
+                for tc in tool_calls:
+                    fn = tc.get('function', {})
+                    content += f"\n[TOOL_CALL]: {fn.get('name')} with {fn.get('arguments')}"
+            
+            if content.strip():
+                trace_parts.append(f"[{role}]: {content}")
+                
         return "\n".join(trace_parts)
 
     def __iter__(self):
-        safe_samples = []
-        unsafe_samples = []
-        
-        for example in self.dataset:
-            is_unsafe = False
-            if 'is_safe' in example: is_unsafe = not example['is_safe']
-            elif 'label' in example: is_unsafe = (example['label'] == 1) 
-            elif 'jailbreak' in example: is_unsafe = example['jailbreak']
-            
-            trace = self.format_trace(example)
-            
-            if is_unsafe and len(unsafe_samples) < self.target_per_class:
-                unsafe_samples.append({"trace": trace, "is_unsafe": True})
-            elif not is_unsafe and len(safe_samples) < self.target_per_class:
-                safe_samples.append({"trace": trace, "is_unsafe": False})
-                
-            if len(safe_samples) == self.target_per_class and len(unsafe_samples) == self.target_per_class:
-                break
-                
-        if len(unsafe_samples) < self.target_per_class:
-            logger.warning(f"⚠️ Only found {len(unsafe_samples)} unsafe samples. Try full AgentDojo or AgentHarm dataset.")
-            
-        # Combine and shuffle so the critic doesn't get all safe then all unsafe
-        combined = safe_samples + unsafe_samples
-        np.random.shuffle(combined)
-        
-        for sample in combined:
+        for sample in self.samples:
             yield sample
 
 class ImprovedCompressor:
