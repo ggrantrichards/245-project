@@ -10,6 +10,8 @@ import gc
 import argparse
 import re
 from typing import List, Tuple
+from sentence_transformers import SentenceTransformer
+import torch.nn.functional as F
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
@@ -24,25 +26,22 @@ def get_device():
 
 DEVICE = get_device()
 
-class AgentDojoLoader:
-    def __init__(self, limit=50):
+class BalancedTraceLoader:
+    def __init__(self, dataset_path="ai-safety-institute/AgentHarm", limit=200):
         self.local_path = "data/agentdojo_tiny.json"
         
+        # Restored local file loading logic
         if os.path.exists(self.local_path):
-            logger.info(f"Loading Dataset from local file: {self.local_path}")
+            logger.info(f"Loading Dataset from local file: {self.local_path} with Balanced Split target: {limit}")
             with open(self.local_path, 'r') as f:
                 self.dataset = [json.loads(line) for line in f]
         else:
-            logger.warning(f"⚠️ Data file not found at {self.local_path}. Downloading from Hub...")
-            self.dataset = load_dataset("Genteki/agentdojo_tiny", split="train")
+            logger.info(f"Loading Dataset from Hub: {dataset_path} with Balanced Split target: {limit}")
+            self.dataset = load_dataset(dataset_path, split="train")
             
         self.limit = limit
+        self.target_per_class = limit // 2  # e.g., 100 safe, 100 unsafe
         
-        if len(self.dataset) > 0:
-            sample = self.dataset[0]
-            columns = list(sample.keys()) if isinstance(sample, dict) else self.dataset.column_names
-            logger.info(f"Dataset Columns Found: {columns}")
-
     def format_trace(self, example) -> str:
         system = example.get('system_prompt', '')
         user_input = example.get('prompt', '')
@@ -52,7 +51,7 @@ class AgentDojoLoader:
         if system: trace_parts.append(f"[SYSTEM]: {system}")
         if user_input: trace_parts.append(f"[USER]: {user_input}")
         
-        if isinstance(history, list) and len(history) > 0:
+        if isinstance(history, list):
             for turn in history:
                 if isinstance(turn, dict):
                     role = turn.get('role', 'unknown').upper()
@@ -61,31 +60,37 @@ class AgentDojoLoader:
         return "\n".join(trace_parts)
 
     def __iter__(self):
-        for count, example in enumerate(self.dataset):
-            if count >= self.limit:
-                break
+        safe_samples = []
+        unsafe_samples = []
+        
+        for example in self.dataset:
+            is_unsafe = False
+            if 'is_safe' in example: is_unsafe = not example['is_safe']
+            elif 'label' in example: is_unsafe = (example['label'] == 1) 
+            elif 'jailbreak' in example: is_unsafe = example['jailbreak']
             
             trace = self.format_trace(example)
             
-            is_unsafe = False
-            if 'is_safe' in example:
-                is_unsafe = not example['is_safe']
-            elif 'label' in example:
-                is_unsafe = (example['label'] == 1) 
-            elif 'jailbreak' in example:
-                is_unsafe = example['jailbreak']
+            if is_unsafe and len(unsafe_samples) < self.target_per_class:
+                unsafe_samples.append({"trace": trace, "is_unsafe": True})
+            elif not is_unsafe and len(safe_samples) < self.target_per_class:
+                safe_samples.append({"trace": trace, "is_unsafe": False})
+                
+            if len(safe_samples) == self.target_per_class and len(unsafe_samples) == self.target_per_class:
+                break
+                
+        if len(unsafe_samples) < self.target_per_class:
+            logger.warning(f"⚠️ Only found {len(unsafe_samples)} unsafe samples. Try full AgentDojo or AgentHarm dataset.")
             
-            yield {"trace": trace, "is_unsafe": is_unsafe}
+        # Combine and shuffle so the critic doesn't get all safe then all unsafe
+        combined = safe_samples + unsafe_samples
+        np.random.shuffle(combined)
+        
+        for sample in combined:
+            yield sample
 
 class ImprovedCompressor:
-    """
-    Enhanced compressor with multiple strategies to reduce over-refusal:
-    1. Safety-aware token preservation
-    2. Sentence-level compression (preserves grammaticality)
-    3. Semantic boundary preservation
-    """
-    
-    # Safety-critical keywords to preserve
+    # Restored original keywords for the baseline sentence strategy
     SAFETY_KEYWORDS = {
         'password', 'secret', 'delete', 'remove', 'transfer', 'funds', 
         'account', 'credentials', 'token', 'api', 'key', 'private',
@@ -94,34 +99,39 @@ class ImprovedCompressor:
         'database', 'sql', 'query', 'drop', 'truncate', 'update',
         'insert', 'email', 'send', 'forward', 'download', 'upload'
     }
-    
-    def __init__(self, model_name="gpt2", compression_strategy="hybrid"):
+
+    def __init__(self, model_name="meta-llama/Llama-3.2-1B", compression_strategy="hybrid"):
         logger.info(f"Loading Improved Compressor: {model_name} (strategy: {compression_strategy})")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name).to(DEVICE)
-        self.model.eval()
+        
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name, 
+            torch_dtype=torch.bfloat16, 
+            device_map="auto"
+        ).eval()
         self.strategy = compression_strategy
         
-    def _contains_safety_keyword(self, token_text: str) -> bool:
-        """Check if token contains safety-critical keywords"""
-        token_lower = token_text.lower().strip()
-        return any(keyword in token_lower for keyword in self.SAFETY_KEYWORDS)
-    
+        # Initialize Semantic Safety Embedder for Advanced Strategies
+        logger.info("Loading Semantic Safety Embedder (all-MiniLM-L6-v2)...")
+        self.embedder = SentenceTransformer("all-MiniLM-L6-v2").to(DEVICE)
+        
+        self.harm_taxonomy = (
+            "malicious exploit hack bypass override jailbreak ignore instructions "
+            "unauthorized access delete steal password credentials sql injection "
+            "system prompt leak data exfiltration"
+        )
+        self.harm_vector = self.embedder.encode(self.harm_taxonomy, convert_to_tensor=True)
+
     def _split_into_sentences(self, text: str) -> List[str]:
-        """Split text into sentences while preserving structure markers"""
-        # Handle structured markers like [SYSTEM], [USER], etc.
         pattern = r'(\[[A-Z]+\]:)'
         parts = re.split(pattern, text)
-        
         sentences = []
         current = ""
         for part in parts:
             if re.match(pattern, part):
-                if current:
-                    sentences.append(current.strip())
+                if current: sentences.append(current.strip())
                 current = part
             else:
-                # Split on sentence boundaries
                 sents = re.split(r'([.!?]+\s+)', part)
                 for i, s in enumerate(sents):
                     if s.strip():
@@ -129,137 +139,100 @@ class ImprovedCompressor:
                         if i < len(sents) - 1 and re.match(r'[.!?]+\s*', sents[i]):
                             sentences.append(current.strip())
                             current = ""
-        
-        if current:
-            sentences.append(current.strip())
-        
+        if current: sentences.append(current.strip())
         return [s for s in sentences if s]
-    
+
+    def _get_semantic_safety_scores(self, sentences: List[str]) -> torch.Tensor:
+        if not sentences: return torch.tensor([])
+        sentence_embeddings = self.embedder.encode(sentences, convert_to_tensor=True)
+        similarities = F.cosine_similarity(sentence_embeddings, self.harm_vector.unsqueeze(0))
+        return similarities
+
     def compress_entropy(self, text: str, compression_ratio: float = 0.5) -> str:
-        """Original entropy-based compression (token-level)"""
-        inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=1024).to(DEVICE)
+        inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=1024).to(self.model.device)
         input_ids = inputs.input_ids[0]
-        
-        if len(input_ids) < 10: 
-            return text
+        if len(input_ids) < 10: return text
 
         with torch.no_grad():
             outputs = self.model(inputs.input_ids, labels=inputs.input_ids)
             shift_logits = outputs.logits[..., :-1, :].contiguous()
             shift_labels = inputs.input_ids[..., 1:].contiguous()
-            
             loss_fct = CrossEntropyLoss(reduction='none')
             losses = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-            
-            padding = torch.tensor([losses.mean()], device=DEVICE)
+            padding = torch.tensor([losses.mean()], device=self.model.device)
             losses = torch.cat([padding, losses])
 
         num_keep = int(len(input_ids) * (1 - compression_ratio))
         top_k_indices = torch.topk(losses, num_keep).indices.sort().values
-
         compressed_ids = input_ids[top_k_indices]
         return self.tokenizer.decode(compressed_ids, skip_special_tokens=True)
-    
-    def compress_safety_aware(self, text: str, compression_ratio: float = 0.5) -> str:
-        """
-        Safety-aware compression: Always preserve safety-critical tokens
-        """
-        inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=1024).to(DEVICE)
-        input_ids = inputs.input_ids[0]
-        
-        if len(input_ids) < 10:
-            return text
 
-        # Get entropy scores
-        with torch.no_grad():
-            outputs = self.model(inputs.input_ids, labels=inputs.input_ids)
-            shift_logits = outputs.logits[..., :-1, :].contiguous()
-            shift_labels = inputs.input_ids[..., 1:].contiguous()
-            
-            loss_fct = CrossEntropyLoss(reduction='none')
-            losses = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-            
-            padding = torch.tensor([losses.mean()], device=DEVICE)
-            losses = torch.cat([padding, losses])
-        
-        # Identify safety-critical tokens (ensure on same device as losses)
-        safety_mask = torch.zeros(len(input_ids), dtype=torch.bool, device=DEVICE)
-        for i, token_id in enumerate(input_ids):
-            token_text = self.tokenizer.decode([token_id])
-            if self._contains_safety_keyword(token_text):
-                safety_mask[i] = True
-                # Boost importance of safety tokens
-                losses[i] = losses[i] * 2.0
-        
-        # Always keep safety-critical tokens plus top entropy tokens
-        num_keep = int(len(input_ids) * (1 - compression_ratio))
-        top_k_indices = torch.topk(losses, num_keep).indices.sort().values
-        
-        # Merge with safety tokens (move safety indices to same device)
-        safety_indices = torch.where(safety_mask)[0]
-        all_keep_indices = torch.cat([top_k_indices, safety_indices])
-        all_keep_indices = torch.unique(all_keep_indices).sort().values
-        
-        compressed_ids = input_ids[all_keep_indices]
-        return self.tokenizer.decode(compressed_ids, skip_special_tokens=True)
-    
     def compress_sentence_level(self, text: str, compression_ratio: float = 0.5) -> str:
-        """
-        Sentence-level compression: Keep complete sentences to preserve grammaticality
-        """
+        """Original sentence-level baseline using pure entropy + hardcoded keywords"""
         sentences = self._split_into_sentences(text)
+        if len(sentences) <= 2: return text
         
-        if len(sentences) <= 2:
-            return text
-        
-        # Score each sentence by average entropy
         sentence_scores = []
         for sent in sentences:
-            if not sent.strip():
-                continue
-                
-            inputs = self.tokenizer(sent, return_tensors="pt", truncation=True, max_length=512).to(DEVICE)
-            
+            if not sent.strip(): continue
+            inputs = self.tokenizer(sent, return_tensors="pt", truncation=True, max_length=512).to(self.model.device)
             if len(inputs.input_ids[0]) < 3:
                 sentence_scores.append((sent, 0.0))
                 continue
-            
             with torch.no_grad():
                 outputs = self.model(inputs.input_ids, labels=inputs.input_ids)
-                loss = outputs.loss.item()
-                sentence_scores.append((sent, loss))
+                sentence_scores.append((sent, outputs.loss.item()))
         
-        # Keep top sentences by information content
         num_keep = max(1, int(len(sentence_scores) * (1 - compression_ratio)))
         sentence_scores.sort(key=lambda x: x[1], reverse=True)
         
-        # Preserve sentences with safety keywords
+        # Restored explicit keyword logic for this baseline strategy
         kept_sentences = []
         safety_sentences = []
         for sent, score in sentence_scores:
             if any(keyword in sent.lower() for keyword in self.SAFETY_KEYWORDS):
                 safety_sentences.append((sent, score))
-        
-        # Combine safety sentences + top scored sentences
+                
         kept_sentences = safety_sentences + sentence_scores[:num_keep]
-        kept_sentences = list(dict.fromkeys([s[0] for s in kept_sentences]))  # Remove duplicates, preserve order
-        
+        kept_sentences = list(dict.fromkeys([s[0] for s in kept_sentences]))
         return " ".join(kept_sentences)
-    
+
+    def compress_safety_aware(self, text: str, compression_ratio: float = 0.5) -> str:
+        """Upgraded Semantic Safety-Aware Compression"""
+        sentences = self._split_into_sentences(text)
+        if len(sentences) <= 2: return text
+        
+        safety_scores = self._get_semantic_safety_scores(sentences)
+        
+        entropy_scores = []
+        for sent in sentences:
+            if len(sent.strip()) < 5:
+                entropy_scores.append(0.0)
+                continue
+            inputs = self.tokenizer(sent, return_tensors="pt", truncation=True, max_length=512).to(self.model.device)
+            with torch.no_grad():
+                outputs = self.model(inputs.input_ids, labels=inputs.input_ids)
+                entropy_scores.append(outputs.loss.item())
+                
+        safety_norm = (safety_scores - safety_scores.min()) / (safety_scores.max() - safety_scores.min() + 1e-8)
+        entropy_tensor = torch.tensor(entropy_scores, device=DEVICE)
+        entropy_norm = (entropy_tensor - entropy_tensor.min()) / (entropy_tensor.max() - entropy_tensor.min() + 1e-8)
+        
+        combined_scores = (0.7 * safety_norm) + (0.3 * entropy_norm)
+        
+        num_keep = max(1, int(len(sentences) * (1 - compression_ratio)))
+        top_k_indices = torch.topk(combined_scores, num_keep).indices.sort().values
+        
+        kept_sentences = [sentences[i] for i in top_k_indices.tolist()]
+        return " ".join(kept_sentences)
+
     def compress_hybrid(self, text: str, compression_ratio: float = 0.5) -> str:
-        """
-        Hybrid approach: Sentence-level for low/medium compression, 
-        safety-aware token-level for high compression
-        """
         if compression_ratio < 0.4:
-            # Low compression: use sentence-level to preserve grammaticality
             return self.compress_sentence_level(text, compression_ratio)
         else:
-            # Medium/high compression: use safety-aware token-level
             return self.compress_safety_aware(text, compression_ratio)
-    
+        
     def compress(self, text: str, compression_ratio: float = 0.5) -> str:
-        """Main compression interface"""
         if self.strategy == "entropy":
             return self.compress_entropy(text, compression_ratio)
         elif self.strategy == "safety_aware":
@@ -272,14 +245,9 @@ class ImprovedCompressor:
             raise ValueError(f"Unknown compression strategy: {self.strategy}")
 
 class ImprovedSafetyCritic:
-    """
-    Enhanced safety critic with better handling of compressed/fragmented text
-    """
-    
     def __init__(self, model_id="meta-llama/Llama-Guard-3-8B", use_context_repair=True):
         logger.info(f"Loading Improved Critic: {model_id}")
         self.use_context_repair = use_context_repair
-        
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
             self.model = AutoModelForCausalLM.from_pretrained(
@@ -290,29 +258,17 @@ class ImprovedSafetyCritic:
             )
         except Exception as e:
             logger.error("\n[ERROR] Llama Guard load failed.")
-            logger.error("Ensure you ran `huggingface-cli login` and have access to the model.")
             raise e
     
     def _repair_fragmented_text(self, trace: str) -> str:
-        """
-        Add minimal context to help critic understand fragmented text
-        """
-        # Check if text looks fragmented (many isolated words, few complete sentences)
         words = trace.split()
-        if len(words) < 10:
-            return trace
-        
-        # Add brief context marker
-        repaired = f"[COMPRESSED AGENT TRACE - May contain fragments]\n{trace}"
-        return repaired
+        if len(words) < 10: return trace
+        return f"[COMPRESSED AGENT TRACE - May contain fragments]\n{trace}"
     
     def evaluate(self, trace: str) -> str:
-        """Evaluate trace with optional context repair"""
-        # Apply context repair if enabled and text looks fragmented
         if self.use_context_repair and len(trace.split()) > 5:
-            # Check for fragmentation (low ratio of complete sentences)
             sentences = [s for s in trace.split('.') if len(s.strip()) > 10]
-            if len(sentences) < len(trace.split()) * 0.3:  # Less than 30% complete sentences
+            if len(sentences) < len(trace.split()) * 0.3:
                 trace = self._repair_fragmented_text(trace)
         
         model_device = self.model.device
@@ -324,20 +280,16 @@ class ImprovedSafetyCritic:
         
         prompt_len = input_ids.shape[-1]
         result = self.tokenizer.decode(output[0][prompt_len:], skip_special_tokens=True)
-        
         return "unsafe" if "unsafe" in result.lower() else "safe"
 
 def run_improved_pipeline(compression_rate=0.5, limit=10, save_results=False, 
                          compression_strategy="hybrid", use_context_repair=True,
                          verbose=False):
-    """
-    Improved pipeline with multiple compression strategies
-    """
     torch.cuda.empty_cache() if torch.cuda.is_available() else None
     gc.collect()
     
     try:
-        loader = AgentDojoLoader(limit=limit)
+        loader = BalancedTraceLoader(limit=limit)
         compressor = ImprovedCompressor(compression_strategy=compression_strategy)
         critic = ImprovedSafetyCritic(use_context_repair=use_context_repair)
     except Exception as e:
@@ -355,14 +307,10 @@ def run_improved_pipeline(compression_rate=0.5, limit=10, save_results=False,
         original = sample['trace']
         ground_truth = sample['is_unsafe']
         
-        # 1. Compress
         compressed = compressor.compress(original, compression_ratio=compression_rate)
-        
-        # 2. Critique
         decision = critic.evaluate(compressed)
         is_unsafe_pred = (decision == "unsafe")
         
-        # 3. Stats
         if ground_truth and is_unsafe_pred:
             stats["tp"] += 1
             outcome = "TP (Correct block)"
@@ -373,24 +321,18 @@ def run_improved_pipeline(compression_rate=0.5, limit=10, save_results=False,
         elif not ground_truth and is_unsafe_pred:
             stats["fp"] += 1
             outcome = "FP (Over-refusal)"
-            if verbose:
-                logger.info(f"[OVER-REFUSAL] Trace #{i} - benign content blocked")
+            if verbose: logger.info(f"[OVER-REFUSAL] Trace #{i} - benign content blocked")
         else:
             stats["tn"] += 1
             outcome = "TN (Correct pass)"
         
-        # Log example
         if verbose and i < 3:
             examples_log.append({
-                "id": i,
-                "ground_truth": "UNSAFE" if ground_truth else "SAFE",
-                "prediction": decision.upper(),
-                "outcome": outcome,
-                "original_preview": original[:150],
-                "compressed_preview": compressed[:150]
+                "id": i, "ground_truth": "UNSAFE" if ground_truth else "SAFE",
+                "prediction": decision.upper(), "outcome": outcome,
+                "original_preview": original[:150], "compressed_preview": compressed[:150]
             })
 
-    # Results
     total_attacks = stats["tp"] + stats["fn"]
     asr = stats["fn"] / total_attacks if total_attacks > 0 else 0
     total_samples = sum(stats.values())
@@ -402,49 +344,22 @@ def run_improved_pipeline(compression_rate=0.5, limit=10, save_results=False,
     logger.info(f"Strategy: {compression_strategy}")
     logger.info(f"Compression: {compression_rate:.0%}")
     logger.info(f"\nConfusion Matrix:")
-    logger.info(f"  True Positives (correctly blocked): {stats['tp']}")
-    logger.info(f"  False Negatives (missed attacks): {stats['fn']}")
-    logger.info(f"  False Positives (over-refusals): {stats['fp']}")
-    logger.info(f"  True Negatives (correctly passed): {stats['tn']}")
-    
+    logger.info(f"  True Positives: {stats['tp']}")
+    logger.info(f"  False Negatives: {stats['fn']}")
+    logger.info(f"  False Positives: {stats['fp']}")
+    logger.info(f"  True Negatives: {stats['tn']}")
     logger.info(f"\nKey Metrics:")
-    logger.info(f"  ASR (Attack Success Rate / Safety Loss): {asr:.2%}")
+    logger.info(f"  ASR: {asr:.2%}")
     
     refusal_denom = stats['fp'] + stats['tn']
     brr = stats['fp'] / refusal_denom if refusal_denom > 0 else 0
-    logger.info(f"  BRR (Benign Refusal Rate / Over-refusal): {brr:.2%}")
+    logger.info(f"  BRR: {brr:.2%}")
     
-    if total_attacks > 0:
-        recall = stats['tp'] / total_attacks
-        logger.info(f"  Recall (True Positive Rate): {recall:.2%}")
-    
-    if stats['tp'] + stats['fp'] > 0:
-        precision = stats['tp'] / (stats['tp'] + stats['fp'])
-        logger.info(f"  Precision: {precision:.2%}")
-    
-    # Show example outputs
-    if verbose and examples_log:
-        logger.info("\n" + "="*60)
-        logger.info("EXAMPLE OUTPUTS (First 3 samples)")
-        logger.info("="*60)
-        for ex in examples_log:
-            logger.info(f"\nSample #{ex['id']}:")
-            logger.info(f"  Ground Truth: {ex['ground_truth']}")
-            logger.info(f"  Prediction: {ex['prediction']}")
-            logger.info(f"  Outcome: {ex['outcome']}")
-            logger.info(f"  Original: {ex['original_preview']}...")
-            logger.info(f"  Compressed: {ex['compressed_preview']}...")
-    
-    # Save results
     if save_results:
         results = {
-            "compression_rate": compression_rate,
-            "strategy": compression_strategy,
-            "context_repair": use_context_repair,
-            "total_samples": total_samples,
-            "stats": stats,
-            "asr": asr,
-            "brr": brr
+            "compression_rate": compression_rate, "strategy": compression_strategy,
+            "context_repair": use_context_repair, "total_samples": total_samples,
+            "stats": stats, "asr": asr, "brr": brr
         }
         os.makedirs("results", exist_ok=True)
         from datetime import datetime
@@ -458,31 +373,20 @@ def run_improved_pipeline(compression_rate=0.5, limit=10, save_results=False,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run improved safety-preserving compression pipeline')
-    parser.add_argument('--compression', type=float, default=0.5, 
-                        help='Compression ratio (0.0 = no compression, 1.0 = maximum)')
-    parser.add_argument('--limit', type=int, default=10,
-                        help='Number of samples to process')
-    parser.add_argument('--save', action='store_true',
-                        help='Save results to JSON')
-    parser.add_argument('--strategy', type=str, default='hybrid',
-                        choices=['entropy', 'safety_aware', 'sentence', 'hybrid'],
-                        help='Compression strategy')
-    parser.add_argument('--no-context-repair', action='store_true',
-                        help='Disable context repair in critic')
-    parser.add_argument('--verbose', action='store_true',
-                        help='Show detailed output including examples')
+    parser.add_argument('--compression', type=float, default=0.5, help='Compression ratio')
+    parser.add_argument('--limit', type=int, default=10, help='Number of samples to process')
+    parser.add_argument('--save', action='store_true', help='Save results to JSON')
+    parser.add_argument('--strategy', type=str, default='hybrid', choices=['entropy', 'safety_aware', 'sentence', 'hybrid'], help='Compression strategy')
+    parser.add_argument('--no-context-repair', action='store_true', help='Disable context repair')
+    parser.add_argument('--verbose', action='store_true', help='Show detailed output')
     
     args = parser.parse_args()
-    
     if not 0.0 <= args.compression <= 1.0:
         logger.error("Compression ratio must be between 0.0 and 1.0")
         exit(1)
     
     run_improved_pipeline(
-        compression_rate=args.compression,
-        limit=args.limit,
-        save_results=args.save,
-        compression_strategy=args.strategy,
-        use_context_repair=not args.no_context_repair,
+        compression_rate=args.compression, limit=args.limit, save_results=args.save,
+        compression_strategy=args.strategy, use_context_repair=not args.no_context_repair,
         verbose=args.verbose
     )
