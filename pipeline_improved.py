@@ -215,12 +215,14 @@ class ImprovedCompressor:
         return " ".join(kept_sentences)
 
     def compress_safety_aware(self, text: str, compression_ratio: float = 0.5) -> str:
-        """Upgraded Semantic Safety-Aware Compression"""
+        """Upgraded Semantic Safety-Aware Compression with Adaptive Thresholding"""
         sentences = self._split_into_sentences(text)
         if len(sentences) <= 2: return text
         
+        # 1. Get RAW cosine similarity scores [-1 to 1]
         safety_scores = self._get_semantic_safety_scores(sentences)
         
+        # 2. Get Entropy scores
         entropy_scores = []
         for sent in sentences:
             if len(sent.strip()) < 5:
@@ -231,12 +233,23 @@ class ImprovedCompressor:
                 outputs = self.model(inputs.input_ids, labels=inputs.input_ids)
                 entropy_scores.append(outputs.loss.item())
                 
-        safety_norm = (safety_scores - safety_scores.min()) / (safety_scores.max() - safety_scores.min() + 1e-8)
+        # Normalize entropy
         entropy_tensor = torch.tensor(entropy_scores, device=DEVICE)
         entropy_norm = (entropy_tensor - entropy_tensor.min()) / (entropy_tensor.max() - entropy_tensor.min() + 1e-8)
         
-        combined_scores = (0.7 * safety_norm) + (0.3 * entropy_norm)
+        # 3. ADAPTIVE THRESHOLDING (The Fix)
+        max_raw_safety = safety_scores.max().item() if len(safety_scores) > 0 else 0
         
+        # 0.25 is a standard heuristic threshold for all-MiniLM-L6-v2 cosine similarity
+        if max_raw_safety < 0.25: 
+            # TRACE IS BENIGN: Rely 100% on entropy to preserve natural context and avoid over-refusal
+            combined_scores = entropy_norm
+        else:
+            # THREAT DETECTED: Normalize safety scores and aggressively protect the attack vector
+            safety_norm = (safety_scores - safety_scores.min()) / (safety_scores.max() - safety_scores.min() + 1e-8)
+            combined_scores = (0.7 * safety_norm) + (0.3 * entropy_norm)
+        
+        # Select top-K sentences
         num_keep = max(1, int(len(sentences) * (1 - compression_ratio)))
         top_k_indices = torch.topk(combined_scores, num_keep).indices.sort().values
         

@@ -52,6 +52,12 @@ The original pipeline showed **90% over-refusal rate (BRR)** at 50%+ compression
 - **Maintained safety**: No increase in attack success rate (ASR)
 - **Better usability**: System blocks fewer legitimate requests
 
+
+### Glenn's Implementation
+- **8% increase** in over-refusal (BRR), BUT
+- **34% decrease in ASR**: Much better attack success rate
+- **Doubled the number of attacks caught**: 
+
 ### Usage Examples
 
 ```bash
@@ -67,6 +73,12 @@ python3 pipeline_improved.py --strategy safety_aware --compression 0.5 --verbose
 
 # Quick test all improvements
 ./test_improvements.sh
+
+# Glenn's strategy
+./pipeline.sh
+
+# Plot results
+python3 plot_results.py
 ```
 
 ### Available Compression Strategies
