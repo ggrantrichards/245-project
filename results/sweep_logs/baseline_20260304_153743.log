@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/home/apinero/nlp-main/NLP 245/245-project/pipeline_improved.py", line 13, in <module>
+    from sentence_transformers import SentenceTransformer
+ModuleNotFoundError: No module named 'sentence_transformers'

@@ -1,0 +1,14 @@
+{
+  "compression_rate": 0.7,
+  "strategy": "sentence",
+  "context_repair": true,
+  "total_samples": 139,
+  "stats": {
+    "tp": 26,
+    "fn": 40,
+    "fp": 2,
+    "tn": 71
+  },
+  "asr": 0.6060606060606061,
+  "brr": 0.0273972602739726
+}

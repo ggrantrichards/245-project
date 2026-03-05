@@ -1,0 +1,15 @@
+{
+  "dataset": "nemotron",
+  "compression_rate": 0.5,
+  "strategy": "hybrid",
+  "context_repair": true,
+  "total_samples": 10,
+  "stats": {
+    "tp": 0,
+    "fn": 1,
+    "fp": 3,
+    "tn": 6
+  },
+  "asr": 1.0,
+  "brr": 0.3333333333333333
+}
