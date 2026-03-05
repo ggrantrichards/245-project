@@ -1,0 +1,14 @@
+{
+  "compression_rate": 0.7,
+  "strategy": "entropy",
+  "context_repair": true,
+  "total_samples": 139,
+  "stats": {
+    "tp": 43,
+    "fn": 23,
+    "fp": 31,
+    "tn": 42
+  },
+  "asr": 0.3484848484848485,
+  "brr": 0.4246575342465753
+}
