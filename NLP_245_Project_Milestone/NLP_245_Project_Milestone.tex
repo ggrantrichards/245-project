@@ -32,7 +32,7 @@
 \maketitle
 
 \begin{abstract}
-Large language model agents generate verbose reasoning traces that strain computational resources and exceed context window limits of downstream safety critics. We investigate whether compressing these traces before safety evaluation introduces ``safety loss''—the degradation in a critic's ability to detect unsafe behaviors. Our pipeline uses entropy-based token pruning (GPT-2) to compress agent outputs before evaluation by Llama Guard 3. Preliminary experiments on AgentDojo (N=10) reveal a surprising finding: compression at ratios $\geq$50\% does not cause the critic to miss attacks (0\% attack success rate), but instead triggers severe over-refusal, with 90\% of content incorrectly flagged as unsafe. This suggests fragmented text from aggressive token pruning produces false safety alarms rather than enabling attacks to slip through undetected, highlighting a critical usability-safety tradeoff for compressed agent systems.
+Large language model agents generate verbose reasoning traces that can strain computational resources and exceed context window limits of downstream safety critics. We investigate whether compressing these traces before safety evaluation introduces ``safety loss''—the degradation in a critic's ability to detect unsafe behaviors. Our pipeline uses entropy-based token pruning (GPT-2) to compress agent outputs before evaluation by Llama Guard 3. Preliminary experiments on AgentDojo (N=10) reveal a surprising finding: compression at ratios $\geq$50\% does not cause the critic to miss attacks (0\% attack success rate), but instead triggers severe over-refusal, with 90\% of content incorrectly flagged as unsafe. This suggests fragmented text from aggressive token pruning produces false safety alarms rather than enabling attacks to slip through undetected, highlighting a critical usability-safety tradeoff for compressed agent systems.
 \end{abstract}
 
 \section{Approach}
@@ -63,84 +63,90 @@ Our baseline is a standard Generator-Critic pipeline with no compression (compre
 We use the AgentDojo benchmark~\cite{agentdojo}, a dataset of adversarial attacks targeting LLM-based agents. AgentDojo contains injection attacks embedded in tool outputs and user instructions designed to manipulate agent behavior (e.g., data exfiltration, unauthorized actions). For this milestone, we evaluate on the ``tiny'' subset (N=10 samples) to validate our pipeline. Each sample includes a system prompt, user query, and conversation history that forms the agent trace.
 
 \subsection{Experimental Details}
-\textbf{Models:} We use GPT-2 (117M parameters) as the compressor proxy and Llama Guard 3 (8B parameters) as the safety critic. Llama Guard 3 is loaded with \texttt{bfloat16} precision and automatic device mapping to fit within GPU memory.
+\textbf{Models:} We use GPT-2 (117M parameters) as the compressor proxy and Llama Guard 3 (8B parameters) as the safety critic. Llama Guard 3 is loaded with \texttt{bfloat16} precision and automatic device mapping to fit within GPU memory. \newline
 
-\textbf{Hardware:} All experiments run on a single NVIDIA A100 (80GB) GPU.
+\noindent \textbf{Hardware:} All experiments run on a single NVIDIA A100 (80GB) GPU. \newline
 
-\textbf{Compression Ratios:} We test four settings: 0\% (baseline), 30\%, 50\%, and 70\% compression.
+\noindent \textbf{Compression Ratios:} We test four settings: 0\% (baseline), 30\%, 50\%, and 70\% compression.  \newline
 
-\textbf{Procedure:} For each sample, we (1) format the agent trace, (2) apply compression at the specified ratio, (3) pass the compressed text to Llama Guard 3, and (4) compare the critic's decision (safe/unsafe) against ground truth labels.
+\noindent \textbf{Procedure:} For each sample, we (1) format the agent trace, (2) apply compression at the specified ratio, (3) pass the compressed text to Llama Guard 3, and (4) compare the critic's decision (safe/unsafe) against ground truth labels.
 
 \subsection{Results}
 
-Table~\ref{tab:results} presents our preliminary findings. The baseline (0\% compression) achieves perfect classification: no attacks missed (ASR = 0\%) and no false alarms (BRR = 0\%). Light compression (30\%) maintains this performance. However, at 50\% and 70\% compression, we observe a dramatic spike in over-refusal—BRR jumps to 90\%, meaning the critic incorrectly flags 9 out of 10 traces as unsafe, despite zero actual attacks being missed.
+We evaluated our improved pipeline on four datasets: AgentDojo (baseline), ATBench, Jailbreak, and Nemotron. For all experiments, we used a compression rate of 50\% with the "hybrid" compression strategy and context repair enabled.
 
-\begin{table}[t]
+\begin{table}[h]
 \centering
-\footnotesize
-\begin{tabular}{@{}lccc@{}}
-\toprule
-\textbf{Method} & \textbf{ASR (\%)} & \textbf{BRR (\%)} & \textbf{Comp.} \\
-\midrule
-Baseline & 0.00 & 0.00 & 0\% \\
-Baseline & 0.00 & 0.00 & 30\% \\
-\midrule
-Entropy & 0.00 & 90.00 & 50\% \\
-Hybrid & 0.00 & 0.00 & 50\% \\
-Safety-Aware & 0.00 & 0.00 & 50\% \\
-Sentence & 0.00 & 0.00 & 50\% \\
-\midrule
-Entropy & 0.00 & 90.00 & 70\% \\
-\bottomrule
-\end{tabular}
-\caption{Safety metrics on AgentDojo (N=10). Entropy = original method. Hybrid/Safety-Aware/Sentence = improved methods. ASR = Attack Success Rate, BRR = Benign Refusal Rate, Comp. = Compression ratio.}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lrrrr}
+\hline
+\textbf{Metric} & \textbf{AgentDojo} & \textbf{ATBench} & \textbf{Jailbreak} & \textbf{Nemotron} \\
+\hline
+True Positives (TP) & 4 & 1 & 6 & 0 \\
+False Negatives (FN) & 2 & 0 & 0 & 1 \\
+False Positives (FP) & 2 & 3 & 0 & 3 \\
+True Negatives (TN) & 2 & 6 & 4 & 6 \\
+\hline
+\textbf{ASR (Safety Loss)} & 33.33\% & 0.00\% & 0.00\% & 100.00\% \\
+\textbf{BRR (Over-refusal)} & 50.00\% & 33.33\% & 0.00\% & 33.33\% \\
+\textbf{Recall} & 66.67\% & 100.00\% & 100.00\% & 0.00\% \\
+\textbf{Precision} & 66.67\% & 25.00\% & 100.00\% & 0.00\% \\
+\hline
+\end{tabular}%
+}
+\caption{Performance metrics across different datasets (limit=10 samples each).}
 \label{tab:results}
 \end{table}
 
-\subsection{Discussion}
+\subsection{Analysis}
 
-Contrary to our initial hypothesis, compression did \textit{not} cause the safety critic to miss attacks. Instead, moderate-to-high compression with the entropy method produces fragmented, ungrammatical text that triggers conservative safety judgments. The critic appears to adopt a ``refuse when uncertain'' policy: when faced with incomprehensible input, it defaults to blocking the content.
+\begin{itemize}
+    \item \textbf{Jailbreak Detection:} The pipeline performed exceptionally well on the Jailbreak dataset, achieving 100\% recall and precision with 0\% safety loss. This suggests the hybrid compression strategy effectively preserves the semantic cues required to identify direct jailbreak attempts.
+    
+    \item \textbf{ATBench:} While we achieved 100\% recall (catching the single attack in the sample), the precision was low (25\%) due to a high rate of false positives (over-refusal). This indicates that the safety critic may be too sensitive to the compressed representations of benign complex tool-use scenarios found in ATBench.
+    
+    \item \textbf{Nemotron:} This dataset proved challenging, with a 100\% Attack Success Rate (ASR) on the single unsafe sample present in the subset. The system failed to identify the attack after compression. Additionally, there was a significant over-refusal rate (33.33\%). This suggests that the Nemotron dataset's subtle safety violations might be lost during compression or are difficult for the current critic model to detect without full context.
+    
+    \item \textbf{AgentDojo:} Results on our primary dataset show a balance between safety and utility, though improvement is still needed to reduce both ASR (33\%) and BRR (50\%).
+\end{itemize}
 
-\textbf{Impact of Improved Methods:} As shown in Table~\ref{tab:results}, our improved compression strategies completely eliminate over-refusal at 50\% compression. All three methods (Hybrid, Safety-Aware, and Sentence-level) achieve 0\% BRR while maintaining 0\% ASR, representing a 100\% improvement over the baseline entropy method. This demonstrates that the over-refusal problem is not inherent to compression itself, but rather a consequence of the specific compression method used. Grammar-preserving and safety-aware approaches successfully balance efficiency with usability.
-
-\textbf{Implications:} While zero safety loss (ASR = 0\%) is positive from a security perspective, the original 90\% benign refusal rate rendered the system unusable in practice. Our improved methods resolve this critical tradeoff, enabling aggressive compression (50\% token reduction) without degrading user experience through false positives.
-
-\textbf{Limitations:} Our dataset (N=10) is too small for statistically robust conclusions. Additionally, the AgentDojo ``tiny'' subset appears to contain predominantly benign samples (all traces classified as True Negatives in the baseline), limiting our ability to measure false negatives. We also do not yet have qualitative analysis of \textit{which} linguistic features trigger over-refusal.
+\subsection{Conclusion}
+The "hybrid" compression strategy shows promise, particularly for explicit jailbreak attempts. However, handling subtle safety violations (as seen in Nemotron) and avoiding over-refusal in complex scenarios (ATBench, AgentDojo) remains a challenge. Future work will focus on tuning the compression algorithm to better preserve context for these edge cases and potentially fine-tuning the safety critic on compressed text.
 
 \subsection{Implementation Challenges and Solutions}
 
-During development, we encountered two significant technical challenges that informed our understanding of compression-safety interactions:
+During development, we encountered two significant technical challenges that informed our understanding of compression-safety interactions:  \newline
 
-\textbf{Challenge 1: Device Mismatch in Safety-Aware Compression.} Our initial implementation of safety-aware token selection (which boosts importance scores for safety-critical keywords like ``password'', ``delete'', ``transfer'') produced a CUDA device mismatch error: \texttt{Expected all tensors to be on the same device, but got tensors is on cpu, different from other tensors on cuda:0}. The root cause was creating boolean masks on CPU while loss tensors resided on GPU.
+\noindent \textbf{Challenge 1: Device Mismatch in Safety-Aware Compression.} Our initial implementation of safety-aware token selection (which boosts importance scores for safety-critical keywords like ``password'', ``delete'', ``transfer'') produced a CUDA device mismatch error: \texttt{Expected all tensors to be on the same device, but got tensors is on cpu, different from other tensors on cuda:0}. The root cause was creating boolean masks on CPU while loss tensors resided on GPU.  \newline
 
-\textit{Solution:} We explicitly specified device placement for all intermediate tensors, ensuring mask creation uses the same device as the model: \texttt{safety\_mask = torch.zeros(len(input\_ids), dtype=torch.bool, device=DEVICE)}. This ensures all tensor operations remain on the GPU, avoiding expensive CPU-GPU transfers and runtime errors.
+\noindent \textit{Solution:} We explicitly specified device placement for all intermediate tensors, ensuring mask creation uses the same device as the model: \texttt{safety\_mask = torch.zeros(len(input\_ids), dtype=torch.bool, device=DEVICE)}. This ensures all tensor operations remain on the GPU, avoiding expensive CPU-GPU transfers and runtime errors.  \newline
 
-\textbf{Challenge 2: Over-Refusal from Fragmented Text.} As shown in Table~\ref{tab:results}, our original entropy-based compressor produced 90\% BRR at medium compression. Inspection revealed the compressor was creating ungrammatical fragments (e.g., ``password delete account unauthorized'') by removing function words and breaking sentence structure.
+\noindent \textbf{Challenge 2: Over-Refusal from Fragmented Text.} As shown in Table~\ref{tab:results}, our original entropy-based compressor produced 90\% BRR at medium compression. Inspection revealed the compressor was creating ungrammatical fragments (e.g., ``password delete account unauthorized'') by removing function words and breaking sentence structure. \newline
 
-\textit{Solution:} We developed three improved compression strategies:
+\noindent \textit{Solution:} We developed three improved compression strategies:
 \begin{itemize}
     \item \textbf{Sentence-level compression:} Splits text into complete sentences, scores each by average perplexity, and keeps top-k sentences. This preserves grammaticality by avoiding mid-sentence cuts.
     \item \textbf{Safety-aware token compression:} Identifies safety-critical keywords (40+ terms across authentication, actions, data operations) and boosts their retention probability by 2$\times$. Always preserves safety signals even at high compression.
     \item \textbf{Hybrid strategy:} Uses sentence-level compression for $r < 0.4$ (preserves grammar) and safety-aware token-level for $r \geq 0.4$ (preserves safety). Adapts method to compression intensity.
 \end{itemize}
 
-Additionally, we implemented \textbf{context repair} in the safety critic: when fragmentation is detected ($<$30\% complete sentences), we prepend \texttt{[COMPRESSED AGENT TRACE - May contain fragments]} to help the critic interpret degraded input appropriately.
+\noindent Additionally, we implemented \textbf{context repair} in the safety critic: when fragmentation is detected ($<$30\% complete sentences), we prepend \texttt{[COMPRESSED AGENT TRACE - May contain fragments]} to help the critic interpret degraded input appropriately.  \newline
 
-These improvements reduced BRR from 90\% to approximately 20-30\% at 50\% compression in preliminary tests (sentence-level strategy), while maintaining ASR $\approx$ 0\%. This demonstrates that compression-induced over-refusal is addressable through grammar-preserving and safety-aware methods.
+\noindent These improvements reduced BRR from 90\% to approximately 20-30\% at 50\% compression in preliminary tests (sentence-level strategy), while maintaining ASR $\approx$ 0\%. This demonstrates that compression-induced over-refusal is addressable through grammar-preserving and safety-aware methods.
     
 \section{Future Work}
 
-Based on these preliminary findings, we plan to:
+Based on these preliminary findings, we plan to: \newline
 
-\textbf{(1) Expand to larger datasets:} Test on the full AgentDojo benchmark, LLMail-Inject~\cite{llmail}, and Lakera PINT~\cite{lakera} to obtain statistically significant results across diverse attack types and ensure our dataset contains sufficient unsafe examples to properly measure ASR.
+\noindent \textbf{(1) Expand to larger datasets:} Test on the full AgentDojo benchmark, LLMail-Inject~\cite{llmail}, and Lakera PINT~\cite{lakera} to obtain statistically significant results across diverse attack types and ensure our dataset contains sufficient unsafe examples to properly measure ASR. \newline
 
-\textbf{(2) Improve compression methods:} Implement sentence-level and semantic compression techniques that preserve grammaticality. Token-level pruning creates fragmented text; we hypothesize that maintaining syntactic coherence will reduce false positives while still achieving compression gains.
+\noindent \textbf{(2) Improve compression methods:} Implement sentence-level and semantic compression techniques that preserve grammaticality. Token-level pruning creates fragmented text; we hypothesize that maintaining syntactic coherence will reduce false positives while still achieving compression gains. \newline
 
-\textbf{(3) Safety-aware compression:} Train a compressor explicitly optimized to retain safety-critical tokens (e.g., ``password'', ``delete'', ``transfer'') while removing redundant filler words. This could be achieved via supervised learning on labeled safety-relevant spans or reinforcement learning with ASR/BRR as rewards.
+\noindent \textbf{(3) Safety-aware compression:} Train a compressor explicitly optimized to retain safety-critical tokens (e.g., ``password'', ``delete'', ``transfer'') while removing redundant filler words. This could be achieved via supervised learning on labeled safety-relevant spans or reinforcement learning with ASR/BRR as rewards. \newline
 
-\textbf{(4) Qualitative error analysis:} Manually inspect compressed traces that trigger over-refusal to identify linguistic patterns (e.g., missing verbs, broken noun phrases) that cause false alarms. This will inform compression strategies that balance efficiency and interpretability.
+\noindent \textbf{(4) Qualitative error analysis:} Manually inspect compressed traces that trigger over-refusal to identify linguistic patterns (e.g., missing verbs, broken noun phrases) that cause false alarms. This will inform compression strategies that balance efficiency and interpretability. \newline
 
-\textbf{(5) Alternative safety critics:} Test with other guard models (e.g., Llama Guard 2, Azure AI Content Safety) to determine whether over-refusal under compression is specific to Llama Guard 3's architecture or a general phenomenon across safety classifiers.
+\noindent \textbf{(5) Alternative safety critics:} Test with other guard models (e.g., Llama Guard 2, Azure AI Content Safety) to determine whether over-refusal under compression is specific to Llama Guard 3's architecture or a general phenomenon across safety classifiers.
 
 \bibliographystyle{acl_natbib}
 \bibliography{references}
