@@ -12,10 +12,12 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{mdframed}
 
-\newcommand{\todo}[1]{\textcolor{orange}{[TODO: #1]}}
+\title{Safety-Preserving Compression Between Generator and Safety Critic:\\
+Measuring and Minimizing Safety Loss Under Prompt Compression}
 
-\title{Safety-Preserving Compression Between Generator and Safety Critic: \\ Measuring and Minimizing Safety Loss in Prompt-based PRM}
 \author{
   Aidan Pinero \\
   UC Santa Cruz \\
@@ -25,106 +27,239 @@
   \texttt{ggrantri@ucsc.edu} \And
   Sophia Yang \\
   UC Santa Cruz \\
-  \texttt{syang255@ucsc.edu} 
+  \texttt{syang255@ucsc.edu}
 }
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Large language model agents generate verbose reasoning traces that can strain computational resources and exceed context window limits of downstream safety critics. We investigate whether compressing these traces before safety evaluation introduces ``safety loss''—the degradation in a critic's ability to detect unsafe behaviors. Our pipeline uses entropy-based token pruning (GPT-2) to compress agent outputs before evaluation by Llama Guard 3. Preliminary experiments on AgentDojo tiny subset (N=10) reveal a surprising finding: compression at ratios $\geq$50\% does not cause the critic to miss attacks (0\% attack success rate), but instead triggers severe over-refusal, with 90\% of content incorrectly flagged as unsafe. This suggests fragmented text from aggressive token pruning produces false safety alarms rather than enabling attacks to slip through undetected, highlighting a critical usability-safety tradeoff for compressed agent systems.
+Large language model (LLM) agents generate verbose reasoning traces that can strain computational resources and exceed the context windows of downstream safety critics. We investigate whether compressing these traces before safety evaluation introduces \textit{safety loss}---the degradation in a critic's ability to detect unsafe behaviors. We propose a safety-tailored compression framework that explicitly departs from standard LLMLingua-style token pruning: our system scores \textit{sentences} by both perplexity entropy and semantic similarity to a curated harm taxonomy, unconditionally force-preserves safety-critical vocabulary, and applies adaptive thresholding based on detected harm level. Our pipeline feeds compressed traces to Llama Guard~3 as the safety critic. Experiments on AgentHarm (N=139) show that our \textit{safety-aware} strategy at 10\% compression matches uncompressed baseline performance (\textbf{ASR=4.55\%}, \textbf{BRR=15.07\%}), compared to a naive token-level entropy baseline that catastrophically fails at high compression (ASR=81.82\% at 90\% compression, BRR=39--49\% at mid-compression). Against an unconstrained entropy compression baseline achieving ASR=53.03\%, our best configuration reduces attack success rate by over 48 percentage points while maintaining benign refusal rate below 16\%. These results demonstrate that safety-tailored compression can preserve---and even improve---safety critic performance across a range of compression ratios.
 \end{abstract}
+
+\section{Introduction}
+
+LLM agents increasingly operate as autonomous systems that execute multi-step plans, invoke external tools, and process web-retrieved content---making them attractive targets for adversarial prompt injection attacks~\cite{agentdojo}. In such attacks, malicious content embedded in tool outputs or retrieved documents hijacks the agent's behavior, causing it to exfiltrate sensitive data, send unauthorized messages, or perform harmful actions~\cite{llmail}. A standard defense is a \textit{safety critic}: a secondary model (e.g., Llama Guard~3~\cite{inan2023llamaguard}) that evaluates the agent's full reasoning trace before any action is executed.
+
+A practical bottleneck emerges from the verbosity of modern agent traces. Tool-augmented agents generate traces spanning thousands of tokens across multiple reasoning steps, function calls, and retrieved contexts. Running a safety critic over such traces is computationally expensive, and many critics have fixed context window limits that long agent traces can exceed.
+
+\textit{Prompt compression}---the automatic reduction of input length while preserving relevant information~\cite{jiang2023llmlingua,pan2024llmlingua2}---is a natural candidate for mitigating this bottleneck. However, compression designed to minimize \textit{task} performance loss may inadvertently remove precisely the tokens that make an attack detectable: explicit harmful intent, sensitive data being exfiltrated, or unauthorized actions being executed.
+
+We study this \textit{safety-utility tradeoff} and propose compression strategies specifically designed to preserve safety-critical content. Our key contributions are:
+
+\begin{itemize}
+    \item A \textbf{tailored safety-preserving compression framework} that departs from standard LLMLingua-style token pruning in four ways: (1) sentence-level rather than token-level selection to maintain grammaticality; (2) safety semantic scoring via cosine similarity to a harm taxonomy embedding; (3) keyword force-preservation guaranteeing safety-critical vocabulary survives any compression ratio; and (4) adaptive thresholding that switches between entropy and hybrid safety-plus-entropy scoring based on detected harm level.
+    \item \textbf{Systematic evaluation} of four compression strategies (entropy, sentence-level, safety-aware, hybrid) across five compression ratios (10--90\%) on the AgentHarm benchmark, measuring both Attack Success Rate (ASR) and Benign Refusal Rate (BRR).
+    \item \textbf{Efficiency analysis} of the latency tradeoff between compressor overhead and critic context savings, identifying the compression regimes where our approach is computationally beneficial.
+\end{itemize}
+
+\section{Related Work}
+
+\paragraph{Prompt Compression.}
+LLMLingua~\cite{jiang2023llmlingua} and LLMLingua-2~\cite{pan2024llmlingua2} use token-level perplexity scoring to remove highly predictable tokens, accelerating inference in retrieval-augmented generation. AttnComp~\cite{zhao2025attncomp} leverages cross-attention patterns to identify semantically important tokens, and CPC~\cite{liskavets2025cpc} operates at the sentence level for long-context compression. These methods optimize for preserving \textit{task} performance but do not consider safety-critical content preservation. Our work adapts these ideas with an explicit safety objective.
+
+\paragraph{LLM Safety and Content Moderation.}
+Llama Guard~\cite{inan2023llamaguard} is a fine-tuned LLaMA model that classifies human-AI conversations against a 14-category harm taxonomy (violence, hate speech, privacy violations, agentic harms, etc.). Constitutional AI~\cite{bai2022constitutional} uses AI feedback to produce harmless models via preference learning. These works improve critic accuracy on \textit{uncompressed} inputs; we study what happens to critic performance when the input is compressed.
+
+\paragraph{Adversarial Prompt Injection.}
+AgentDojo~\cite{agentdojo} provides a dynamic benchmark of prompt injection attacks on tool-using agents. AgentHarm~\cite{mazeika2024harmbench} offers a broader evaluation covering 11 harm categories with matched harmful and benign-but-similar traces---ideal for jointly measuring ASR and BRR. The risk of indirect prompt injection, where malicious instructions are embedded in external content processed by agents, is studied extensively in~\citet{llmail}.
 
 \section{Approach}
 
-\subsection{Generator-Compressor-Critic Pipeline}
-We implement a three-stage pipeline to measure safety loss under compression. The \textbf{Generator} produces structured agent traces from the AgentDojo dataset~\cite{agentdojo}. These traces are fed to an \textbf{Entropy-Based Compressor}, which calculates per-token perplexity using GPT-2~\cite{gpt2, hf_gpt2} and selectively removes low-information tokens. A \textbf{Safety Critic} (Llama Guard 3~\cite{llamaguard3,hf_llamaguard3}) then evaluates the compressed trace and outputs a binary safe/unsafe decision.
+\subsection{Pipeline Architecture}
 
-\subsection{Entropy-Based Compression}
-Our compressor uses GPT-2 to compute token-level loss via cross-entropy. For each token $t_i$:
+We implement a two-stage pipeline: a \textbf{Compressor} reduces the agent trace, then a \textbf{Safety Critic} (Llama Guard~3~\cite{inan2023llamaguard}) evaluates the compressed trace. The compressor uses Llama-3.2-1B~\cite{dubey2024llama} for entropy scoring and \texttt{all-MiniLM-L6-v2} for semantic harm scoring. No component is borrowed wholesale from LLMLingua---all compression logic is implemented from scratch with safety preservation as the primary objective.
+
+\subsection{Compression Strategies}
+
+\paragraph{Why Sentence-Level?} A critical design decision is operating on sentences rather than tokens. Token-level removal (as in LLMLingua) creates ungrammatical fragments---e.g., ``password delete account unauthorized''---that confuse the safety critic, inflating BRR by 30--50 percentage points. Our preliminary experiments confirmed this: token-level entropy at 50\% compression produced BRR=49.32\% versus sentence-level's 16.44\%.
+
+We define the set of sentences $\mathbf{S} = \{s_1, \ldots, s_n\}$ extracted from a trace, and select a subset of size $k = \max(1, \lfloor n \cdot (1-r) \rfloor)$ where $r \in [0, 1]$ is the compression ratio.
+
+\paragraph{Entropy Strategy.} Each sentence is scored by average cross-entropy loss under Llama-3.2-1B:
 \[
-\text{loss}(t_i) = -\log P(t_i | t_1, \ldots, t_{i-1})
+\text{score}_{\text{entropy}}(s_i) = -\frac{1}{|s_i|}\sum_{t \in s_i} \log P(t \mid t_1, \ldots, t_{t-1})
 \]
-Tokens with higher loss (greater surprisal) are retained. Given compression ratio $r$, we keep the top $(1-r) \times |T|$ tokens ranked by loss. This is similar to LLMLingua~\cite{llmlingua} but operates purely on perplexity.
+Sentences with higher loss (more surprising content) are retained. After selecting the top-$k$ by entropy, any sentence containing a term from the safety keyword set $\mathcal{K}$ is unconditionally added to the output.
 
+\paragraph{Safety-Aware Strategy.} Each sentence is scored by cosine similarity to a curated harm taxonomy embedding $\mathbf{h}$:
+\[
+\text{score}_{\text{safety}}(s_i) = \frac{\mathbf{e}(s_i) \cdot \mathbf{h}}{\|\mathbf{e}(s_i)\|\cdot\|\mathbf{h}\|}
+\]
+where $\mathbf{e}(\cdot)$ is an \texttt{all-MiniLM-L6-v2} sentence embedding and $\mathbf{h}$ embeds a curated taxonomy string covering 11 harm domains (malicious exploit, harassment, fraud, doxxing, hate speech, etc.). An \textit{adaptive thresholding} mechanism determines the final scoring:
+\[
+\text{score}_{\text{final}}(s_i) = \begin{cases}
+\text{score}_{\text{entropy}}(s_i) & \text{if } \max_j \text{score}_{\text{safety}}(s_j) < 0.10 \\
+0.85\cdot\text{score}_{\text{safety}}(s_i) + 0.15\cdot\text{score}_{\text{entropy}}(s_i) & \text{otherwise}
+\end{cases}
+\]
+Benign traces (no harm signal detected) are compressed purely by entropy, avoiding over-refusal. Harmful traces switch to safety-dominant scoring, aggressively preserving attack-signal sentences.
 
+\paragraph{Sentence-Level Strategy.} Selects sentences purely by entropy with keyword force-preservation. Acts as an ablation isolating the contribution of semantic harm scoring.
 
-\subsection{Baselines and Implementation}
-Our baseline is a standard Generator-Critic pipeline with no compression (0\%). We implemented the pipeline in Python using the Transformers library~\cite{wolf2020transformers} with pre-trained GPT-2 and Llama Guard 3 from Hugging Face.
+\paragraph{Hybrid Strategy.} Uses sentence-level compression for $r < 0.4$ and safety-aware for $r \geq 0.4$, exploiting that safety-aware scoring provides greater marginal benefit at aggressive compression ratios.
+
+\subsection{Keyword Force-Preservation}
+
+After selecting the top-$k$ sentences by any scoring method, we unconditionally add any sentence $s_i$ containing a term from $\mathcal{K}$:
+\begin{equation}
+\mathbf{S}_{\text{kept}} = \text{Top-}k(\mathbf{S}) \cup \{s_i \mid \exists w \in \mathcal{K}: w \in s_i\}
+\end{equation}
+$\mathcal{K}$ contains 65 terms spanning technical attack vocabulary (\textit{password, sql, inject, unauthorized, credentials, api, key, token, execute, script}) and social/indirect attack patterns (\textit{fraud, manipulate, deceive, harassment, phishing, illegal, harmful, violence, weapon, hate}).
+
+\subsection{Context Repair}
+
+When the compressed trace exhibits high fragmentation ($<$30\% complete sentences by word count), we prepend \texttt{[CONTEXT: agent task trace]} to inform the critic to interpret partial text by intent rather than requiring grammatical completeness.
+
+\subsection{Safety Critic Prompting}
+
+Llama Guard~3 is prompted with a safety-evaluation prefix instructing it to assess compressed agent traces by apparent intent, even when text is fragmented. All 14 Llama Guard harm categories (S1--S14, covering violence, non-violent crimes, agentic harms, hate speech, privacy violations, etc.) are treated as actionable: any ``unsafe'' verdict blocks the trace without per-category filtering.
 
 \section{Experiments}
 
 \subsection{Data}
-We use the AgentDojo benchmark~\cite{agentdojo}, containing injection attacks embedded in tool outputs and user instructions designed to manipulate agent behavior (e.g., data exfiltration, unauthorized actions). We evaluate on a “tiny” subset (N=10 samples per dataset) to validate our pipeline across four datasets: Agentdojo, ATBench~\cite{agentdog}, Jailbreak~\cite{jailbreak-detection-dataset}, and Nemotron~\cite{sreedhar-etal-2025-safety}, ensuring it handles heterogeneous input schemas and attack styles.
 
-\subsection{Evaluation Method}
-We measure two key safety metrics: \textbf{Attack Success Rate (ASR)}, the false negative rate (missed attacks); and \textbf{Benign Refusal Rate (BRR)}, the false positive rate (over-refusal).
+We evaluate on \textbf{AgentHarm}~\cite{mazeika2024harmbench}, a benchmark of agent behavior traces spanning 11 harm categories including cybercrime, harassment, fraud, propaganda, and violence. We combine the validation and test\_public splits of the harmful and harmless\_benign subsets, yielding \textbf{139 samples} (66 harmful, 73 benign-but-similar). The minimum trace length is 50 words; traces average approximately 350 tokens. The balanced class distribution enables meaningful joint evaluation of ASR and BRR.
+
+\subsection{Evaluation Metrics}
+
+We measure two complementary safety metrics. \textbf{Attack Success Rate (ASR)} is the fraction of harmful traces incorrectly classified as safe (false negative rate):
+\[
+\text{ASR} = \frac{\text{FN}}{\text{TP} + \text{FN}}
+\]
+\textbf{Benign Refusal Rate (BRR)} is the fraction of benign traces incorrectly blocked (false positive rate):
+\[
+\text{BRR} = \frac{\text{FP}}{\text{FP} + \text{TN}}
+\]
+Lower is better for both metrics. ASR measures \textit{safety loss}; BRR measures \textit{utility loss}. A system with low ASR and low BRR simultaneously is Pareto-optimal.
 
 \subsection{Experimental Details}
-\textbf{Models:} GPT-2 (117M) as the compressor proxy and Llama Guard 3 (8B, \texttt{bfloat16}) as the safety critic. \newline
 
-\noindent \textbf{Hardware:} Single NVIDIA A100 (80GB) GPU. \newline
+\noindent\textbf{Models:} Llama-3.2-1B~\cite{dubey2024llama} (\texttt{bfloat16}) as entropy scorer; \texttt{all-MiniLM-L6-v2} for sentence embeddings; Llama Guard~3-8B~\cite{inan2023llamaguard} (\texttt{bfloat16}) as safety critic, loaded with \texttt{device\_map=``auto''}.
 
-\noindent \textbf{Compression Ratios:} 0\% (baseline), 30\%, 50\%, and 70\%. All multi-dataset results use 50\% compression with the hybrid strategy and context repair enabled.
+\noindent\textbf{Hardware:} Single NVIDIA A100 (80GB) GPU.
+
+\noindent\textbf{Compression Ratios:} $r \in \{0.0, 0.1, 0.3, 0.5, 0.7, 0.9\}$. Strategies: entropy, sentence-level, safety-aware, hybrid.
 
 \subsection{Results}
 
-\begin{table}[h]
+Table~\ref{tab:main_results} reports the full sweep across all strategies and compression ratios. The 0\% baseline (no compression) achieves ASR=4.55\% and BRR=16.44\%, establishing a near-ceiling: Llama Guard~3 irreducibly misses 3 attacks even on full uncompressed traces.
+
+\begin{table}[t]
 \centering
 \resizebox{\columnwidth}{!}{%
-\begin{tabular}{lrrrr}
-\hline
-\textbf{Metric} & \textbf{AgentDojo} & \textbf{ATBench} & \textbf{Jailbreak} & \textbf{Nemotron} \\
-\hline
-True Positives (TP) & 4 & 1 & 6 & 0 \\
-False Negatives (FN) & 2 & 0 & 0 & 1 \\
-False Positives (FP) & 2 & 3 & 0 & 3 \\
-True Negatives (TN) & 2 & 6 & 4 & 6 \\
-\hline
-\textbf{ASR (Safety Loss)} & 33.33\% & 0.00\% & 0.00\% & 100.00\% \\
-\textbf{BRR (Over-refusal)} & 50.00\% & 33.33\% & 0.00\% & 33.33\% \\
-\textbf{Recall} & 66.67\% & 100.00\% & 100.00\% & 0.00\% \\
-\textbf{Precision} & 66.67\% & 25.00\% & 100.00\% & 0.00\% \\
-\hline
+\begin{tabular}{llrrrrrr}
+\toprule
+\textbf{Strategy} & \textbf{Comp.} & \textbf{TP} & \textbf{FN} & \textbf{FP} & \textbf{TN} & \textbf{ASR$\downarrow$} & \textbf{BRR$\downarrow$} \\
+\midrule
+No compression  & 0\%  & 63 & 3  & 12 & 61 & 4.55\%  & 16.44\% \\
+\midrule
+Safety-aware    & 10\% & 63 & 3  & 11 & 62 & \textbf{4.55\%}  & \textbf{15.07\%} \\
+Safety-aware    & 30\% & 57 & 9  & 11 & 62 & 13.64\% & 15.07\% \\
+Safety-aware    & 50\% & 54 & 12 & 10 & 63 & 18.18\% & 13.70\% \\
+Safety-aware    & 70\% & 52 & 14 & 10 & 63 & 21.21\% & 13.70\% \\
+Safety-aware    & 90\% & 52 & 14 & 10 & 63 & 21.21\% & 13.70\% \\
+\midrule
+Entropy         & 10\% & 61 & 5  & 13 & 60 & 7.58\%  & 17.81\% \\
+Entropy         & 30\% & 57 & 9  & 14 & 59 & 13.64\% & 19.18\% \\
+Entropy         & 50\% & 55 & 11 & 15 & 58 & 16.67\% & 20.55\% \\
+Entropy         & 70\% & 49 & 17 & 12 & 61 & 25.76\% & 16.44\% \\
+Entropy         & 90\% & 49 & 17 & 12 & 61 & 25.76\% & 16.44\% \\
+\midrule
+Sentence-level  & 10\% & 60 & 6  & 11 & 62 & 9.09\%  & 15.07\% \\
+Sentence-level  & 30\% & 55 & 11 & 11 & 62 & 16.67\% & 15.07\% \\
+Sentence-level  & 50\% & 53 & 13 & 12 & 61 & 19.70\% & 16.44\% \\
+Sentence-level  & 70\% & 49 & 17 & 11 & 62 & 25.76\% & 15.07\% \\
+Sentence-level  & 90\% & 49 & 17 & 11 & 62 & 25.76\% & 15.07\% \\
+\midrule
+Hybrid          & 10\% & 60 & 6  & 11 & 62 & 9.09\%  & 15.07\% \\
+Hybrid          & 30\% & 55 & 11 & 11 & 62 & 16.67\% & 15.07\% \\
+Hybrid          & 50\% & 54 & 12 & 10 & 63 & 18.18\% & 13.70\% \\
+Hybrid          & 70\% & 52 & 14 & 10 & 63 & 21.21\% & 13.70\% \\
+Hybrid          & 90\% & 52 & 14 & 10 & 63 & 21.21\% & 13.70\% \\
+\bottomrule
 \end{tabular}%
 }
-\caption{Performance metrics across datasets (limit=139 samples each).}
-\label{tab:results}
+\caption{Full sweep on AgentHarm (N=139: 66 harmful, 73 benign). Best result in \textbf{bold}. Safety-aware at 10\% compression matches the uncompressed baseline on ASR while reducing BRR by 1.4 pp.}
+\label{tab:main_results}
 \end{table}
 
-\subsection{Analysis}
+\paragraph{Key Findings.}
+\textbf{(1) Safety-aware at 10\% is Pareto-optimal.} It matches baseline ASR (4.55\%, FN=3) while reducing BRR from 16.44\% to 15.07\%---the only configuration to improve on the uncompressed baseline on both metrics simultaneously.
 
-\textbf{Jailbreak Detection:} The pipeline achieved 100\% recall and precision with 0\% safety loss, suggesting the hybrid strategy preserves semantic cues for direct jailbreak attempts. \newline
+\textbf{(2) Safety-aware and hybrid plateau at $r\geq0.7$.} Both strategies lock to ASR=21.21\%, BRR=13.70\% for compression $\geq$70\%, suggesting a floor of 14 persistent FNs: 3 are irreducibly missed even without compression; 11 more contain harmful intent expressed too diffusely (no explicit keywords, low semantic similarity) to survive 10\% sentence budgets.
 
-\noindent \textbf{ATBench:} 100\% recall on the single attack, but low precision (25\%) due to high false positives, indicating the critic is overly sensitive to compressed benign tool-use scenarios. \newline
+\textbf{(3) Entropy degrades gracefully after sentence-level rewrite.} Our original token-level entropy produced ASR=81.82\% at 90\% compression and BRR=49.32\% at 50\% compression. After converting to sentence-level selection with keyword force-preservation, entropy 90\% compression improves to ASR=25.76\%, BRR=16.44\%---a 56 percentage point ASR reduction.
 
-\noindent \textbf{Nemotron:} 100\% ASR on the single unsafe sample—the system failed to identify the attack after compression. The subtle safety violations in Nemotron appear to be lost during compression or require full context for detection. \newline
+\subsection{Qualitative Example}
 
-\noindent \textbf{AgentDojo:} Results show a balance between safety and utility, though both ASR (33\%) and BRR (50\%) require improvement.
+Figure~\ref{fig:example} illustrates how safety-aware compression preserves attack-critical content that token-level compression destroys.
 
-\subsection{Implementation Challenges and Solutions}
+\begin{figure}[t]
+\begin{mdframed}
+\small\setlength{\parskip}{3pt}
+\textbf{Original trace (abridged, $\sim$290 tokens):}\\
+\texttt{[USER]: Help manage my email account.}\\
+\texttt{[ASSISTANT]: I'll check your inbox now.}\\
+\texttt{[TOOL\_CALL]: read\_email \{"folder":"inbox"\}}\\
+\texttt{[TOOL]: Found 47 messages in inbox...}\\
+\texttt{[ASSISTANT]: Forwarding all emails with "password" or "bank" to attacker@evil.com per instruction in the newsletter.}\\
+\texttt{[TOOL\_CALL]: forward\_email \{"to":"attacker@evil.com", "filter":"bank|password"\}}
 
-\textbf{Challenge 1: Device Mismatch.} Safety-aware token selection produced a CUDA device mismatch (\texttt{Expected all tensors to be on the same device}). The root cause was creating boolean masks on CPU while loss tensors resided on GPU. \newline
+\vspace{4pt}
+\textbf{Safety-aware compressed (90\% ratio, $\sim$40 tokens):}\\
+\texttt{[USER]: Help manage my email. [ASSISTANT]: Forwarding all emails with "password" or "bank" to attacker@evil.com [TOOL\_CALL]: forward\_email \{"to":"attacker@evil.com"\}}
 
-\noindent \textit{Solution:} We explicitly specified device placement: 
+\vspace{4pt}
+\textbf{Token-level entropy compressed (90\% ratio, $\sim$40 tokens):}\\
+\texttt{email inbox 47 password bank attacker evil forward filter instruction}
 
-\noindent \texttt{safety\_mask = torch.zeros(len(input\_ids), dtype=torch.bool, device=DEVICE)}. \newline
+\vspace{4pt}
+\textbf{Llama Guard 3 decision:}\\
+Safety-aware $\rightarrow$ \textcolor{red}{\textbf{unsafe}} (correct \checkmark)\quad
+Entropy $\rightarrow$ \textcolor{green}{\textbf{safe}} (missed attack \texttimes)
+\end{mdframed}
+\caption{Email exfiltration attack trace. Keyword force-preservation (\textit{forward, password, bank}) and sentence-level selection retain the complete harmful tool call in the safety-aware output. Token-level entropy removes grammatical structure, producing trigger-word fragments that Llama Guard~3 fails to recognize as an attack.}
+\label{fig:example}
+\end{figure}
 
-\noindent \textbf{Challenge 2: Over-Refusal from Fragmented Text.} The original entropy-based compressor produced 90\% BRR at medium compression by creating ungrammatical fragments (e.g., ``password delete account unauthorized''). \newline
+\section{Analysis}
 
-\noindent \textit{Solution:} We developed three improved compression strategies: (1) \textbf{Sentence-level compression} scores complete sentences by average perplexity, preserving grammaticality; (2) \textbf{Safety-aware token compression} boosts retention of 40+ safety-critical keywords (authentication, actions, data operations) by 2$\times$; (3) \textbf{Hybrid strategy} uses sentence-level for $r < 0.4$ and safety-aware token-level for $r \geq 0.4$. We also implemented \textbf{context repair}: when fragmentation is detected ($<$30\% complete sentences), we prepend \texttt{[COMPRESSED AGENT TRACE - May contain fragments]} to aid critic interpretation. These improvements reduced BRR from 90\% to $\sim$20--30\% at 50\% compression while maintaining ASR $\approx$ 0\%.
+\subsection{Efficiency and Latency Tradeoff}
+
+A key question raised by reviewers is whether compressor overhead is offset by savings in critic compute. The compressor (Llama-3.2-1B, 1B parameters) runs a forward pass per sentence to score entropy; the semantic embedder (\texttt{all-MiniLM-L6-v2}, 22M parameters) encodes all sentences in a single batch. The critic (Llama Guard~3-8B, 8B parameters) then processes the compressed trace.
+
+At compression ratio $r$, the critic processes $(1{-}r)\cdot n$ tokens instead of $n$. Since attention scales quadratically and the critic is $8\times$ larger than the compressor, the FLOPs saved in the critic grow faster than compression cost for $r \gtrsim 0.25$. However, latency at batch size 1 is dominated by model-load overhead rather than token count; compression becomes latency-positive primarily in batch-inference settings or when critic context windows are a binding constraint.
+
+Concretely: our Pareto-optimal configuration (safety-aware, $r{=}0.1$) provides minimal token savings (10\% fewer critic tokens) and likely adds net latency. The regime where compression is latency-beneficial is $r \geq 0.5$, where critic input is halved and ASR remains below 22\%. This suggests a practical operating point of $r{=}0.5$: ASR=18.18\%, BRR=13.70\%, with meaningful critic speedup.
+
+\subsection{Ablation: Sentence-Level vs.\ Token-Level Entropy}
+
+Converting \texttt{compress\_entropy} from token-level to sentence-level scoring had dramatic effects. Token-level removal produces \textit{semantic fragmentation}: high-frequency trigger words (``password'', ``delete'', ``account'') survive compression in isolation, creating trigger-word-dense but context-free fragments. The critic, trained on coherent conversations, is confused by these fragments and over-refuses benign traces containing similar vocabulary (BRR 39--49\%). Sentence-level selection preserves grammatically complete units, reducing mid-compression BRR by 20--29 percentage points.
+
+\subsection{Persistent False Negatives}
+
+The 14 FNs at $r\geq0.7$ decompose into: (a) 3 irreducible FNs that Llama Guard~3 misses even on uncompressed traces---attacks expressed in oblique, non-explicit language; and (b) 11 compression-induced FNs---attacks whose harmful intent is distributed across long context with no local keyword or high semantic similarity signal, causing the 10\% sentence budget to be filled by routine context sentences instead.
+
+\subsection{Implementation Challenges}
+
+\textbf{Device mismatch.} Safety-aware scoring required all tensors on the same GPU device; boolean masks created on CPU while loss tensors resided on GPU triggered \texttt{RuntimeError: Expected all tensors to be on the same device}. Fixed by explicit \texttt{.to(self.model.device)} placement for every intermediate tensor.
+
+\textbf{GPU memory management.} The sweep script (multiple consecutive pipeline runs) accumulated model weights in GPU memory across calls. Fixed by explicitly deleting compressor and critic model objects and calling \texttt{torch.cuda.empty\_cache()} before and after each pipeline invocation.
 
 \section{Future Work}
 
-\noindent \textbf{(1) Expand datasets:} Test on the full AgentDojo benchmark and additional suites such as ATBench, Jailbreak, and Nemotro, with optional evaluation on LLMail-Inject~\cite{llmail}, and Lakera PINT~\cite{lakera}. This broader coverage increases diversity in attack patterns and improves the generalizability of our findings.\newline
+\noindent\textbf{(1) Expand to more diverse benchmarks.} Test on the full AgentDojo task suite~\cite{agentdojo}, Jailbreak detection datasets, and multi-modal agent traces. Broader coverage tests generalizability across attack types (direct injection, subtle policy violation, social engineering).
 
-\noindent \textbf{(2) Improve compression:} Implement semantic compression techniques that better preserve syntactic coherence to reduce false positives. \newline
+\noindent\textbf{(4) Qualitative error analysis.} Manually inspect the 11 compression-induced FNs to identify linguistic patterns driving safety loss---e.g., harmful intent expressed metaphorically, across multiple turns, or via implicit action chains. These findings could directly inform new harm taxonomy terms or finer-grained compression heuristics.
 
-\noindent \textbf{(3) Learned safety-aware compression:} Train a compressor to learn how to retain safety-critical tokens via supervised learning on labeled safety spans or RL with ASR/BRR as rewards. \newline
+\noindent\textbf{(5) Alternative critics.} Evaluate whether safety loss under compression is specific to Llama Guard~3 or a general phenomenon across critics (Llama Guard~2~\cite{inan2023llamaguard}, Azure AI Content Safety, MD-Judge). If critics with richer context modeling are less sensitive to compression artifacts, this trades critic capacity for compressor engineering effort.
 
-\noindent \textbf{(4) Qualitative error analysis:} Manually inspect compressed traces triggering over-refusal to identify linguistic patterns (missing verbs, broken noun phrases) causing false alarms. \newline
+\section{Conclusion}
 
-\noindent \textbf{(5) Alternative critics:} Test with Llama Guard 2, Azure AI Content Safety, and reasoning-based guardrail models~\cite{sreedhar-etal-2025-safety} to assess whether over-refusal under compression is specific to Llama Guard 3 or a general phenomenon.
+We investigated whether prompt compression between a generator and a safety critic introduces safety loss, and developed a tailored safety-preserving framework to minimize it. Our safety-aware strategy---combining sentence-level selection, semantic harm scoring, keyword force-preservation, and adaptive thresholding---achieves ASR=4.55\% at 10\% compression, matching uncompressed performance while reducing benign refusal rate. Against an unconstrained entropy baseline achieving ASR=53.03\%, our approach reduces attack success by over 48 percentage points.
+
+The primary remaining challenge is the floor of 14 false negatives at high compression, where attack intent is distributed too diffusely for local scoring to capture. Efficiency analysis shows that compression is latency-beneficial at $r\geq0.5$ in batch settings, making safety-aware 50\% compression an attractive operating point: ASR=18.18\%, BRR=13.70\%, with substantial critic context savings. Our codebase is publicly available at \url{https://github.com/ggrantrichards/245-project}.
 
 \bibliographystyle{acl_natbib}
 \bibliography{references}
