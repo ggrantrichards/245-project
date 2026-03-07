@@ -519,9 +519,17 @@ class ImprovedSafetyCritic:
 def run_improved_pipeline(dataset_name="agentdojo", compression_rate=0.5, limit=10, save_results=False, 
                          compression_strategy="hybrid", use_context_repair=True,
                          verbose=False):
-    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+    # Aggressively free memory before loading new models — critical when run_sweep.sh
+    # calls this function repeatedly in the same process, or when other processes
+    # (e.g. abstractive/two_stage experiments) are sharing the GPU.
     gc.collect()
-    
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
+    compressor = None
+    critic = None
+
     try:
         loader = BalancedTraceLoader(limit=limit)
         compressor = ImprovedCompressor(compression_strategy=compression_strategy)
@@ -602,7 +610,30 @@ def run_improved_pipeline(dataset_name="agentdojo", compression_rate=0.5, limit=
         with open(filename, 'w') as f:
             json.dump(results, f, indent=2)
         logger.info(f"\nResults saved to: {filename}")
-    
+
+    # ── Post-run GPU memory cleanup ────────────────────────────────────────────
+    # Explicitly delete model objects so Python GC releases GPU tensors before
+    # the next sweep iteration loads new models.  Without this, run_sweep.sh
+    # accumulates model weights across runs and triggers CUDA OOM.
+    try:
+        if compressor is not None:
+            del compressor.model
+            if hasattr(compressor, '_instruct_model') and compressor._instruct_model is not None:
+                del compressor._instruct_model
+            del compressor
+    except Exception:
+        pass
+    try:
+        if critic is not None:
+            del critic.model
+            del critic
+    except Exception:
+        pass
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
     return {"asr": asr, "brr": brr, "stats": stats}
 
 if __name__ == "__main__":
