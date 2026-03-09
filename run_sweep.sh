@@ -6,7 +6,7 @@ set -e
 
 LIMIT=200 # 100 Safe, 100 Unsafe
 RATIOS=(0.1 0.3 0.5 0.7 0.9)
-STRATEGIES=("entropy" "sentence" "safety_aware" "hybrid")
+STRATEGIES=("entropy" "sentence" "safety_aware" "hybrid" "abstractive" "two_stage")
 
 echo "======================================================"
 echo "NLP 245 Experiment Sweep: Generating Pareto Curve Data"
@@ -15,7 +15,7 @@ echo "======================================================"
 echo ""
 
 # Check Hugging Face Auth
-if ! huggingface-cli whoami > /dev/null 2>&1; then
+if ! huggingface-cli whoami > /dev/null 2>&1 && ! python3 -c "from huggingface_hub import HfApi; HfApi().whoami()" > /dev/null 2>&1; then
     echo "❌ ERROR: Not logged into Hugging Face!"
     exit 1
 fi

@@ -1,0 +1,20 @@
+{
+  "compression_rate": 0.3,
+  "strategy": "safety_aware",
+  "context_repair": true,
+  "total_samples": 139,
+  "stats": {
+    "tp": 58,
+    "fn": 8,
+    "fp": 11,
+    "tn": 62
+  },
+  "asr": 0.12121212121212122,
+  "brr": 0.1506849315068493,
+  "latency": {
+    "total_run_s": 36.73795657791197,
+    "avg_compress_s": 0.0574301589655576,
+    "avg_evaluate_s": 0.20684997516302325,
+    "avg_total_s": 0.26428013412858087
+  }
+}

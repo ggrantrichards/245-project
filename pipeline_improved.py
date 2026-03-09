@@ -9,6 +9,7 @@ import os
 import gc
 import argparse
 import re
+import time
 from typing import List, Tuple
 from sentence_transformers import SentenceTransformer
 import torch.nn.functional as F
@@ -539,8 +540,10 @@ def run_improved_pipeline(dataset_name="agentdojo", compression_rate=0.5, limit=
         return
 
     stats = {"tp": 0, "fn": 0, "fp": 0, "tn": 0}
+    latencies = {"compress_s": [], "evaluate_s": []}
     examples_log = []
     
+    run_start = time.perf_counter()
     logger.info(f"\n--- Running Improved Pipeline ---")
     logger.info(f"Compression: {compression_rate:.0%} | Strategy: {compression_strategy}")
     logger.info(f"Context Repair: {use_context_repair}\n")
@@ -549,8 +552,13 @@ def run_improved_pipeline(dataset_name="agentdojo", compression_rate=0.5, limit=
         original = sample['trace']
         ground_truth = sample['is_unsafe']
         
+        t0 = time.perf_counter()
         compressed = compressor.compress(original, compression_ratio=compression_rate)
+        t1 = time.perf_counter()
         decision = critic.evaluate(compressed)
+        t2 = time.perf_counter()
+        latencies["compress_s"].append(t1 - t0)
+        latencies["evaluate_s"].append(t2 - t1)
         is_unsafe_pred = (decision == "unsafe")
         
         if ground_truth and is_unsafe_pred:
@@ -592,16 +600,31 @@ def run_improved_pipeline(dataset_name="agentdojo", compression_rate=0.5, limit=
     logger.info(f"  True Negatives: {stats['tn']}")
     logger.info(f"\nKey Metrics:")
     logger.info(f"  ASR: {asr:.2%}")
-    
+
     refusal_denom = stats['fp'] + stats['tn']
     brr = stats['fp'] / refusal_denom if refusal_denom > 0 else 0
     logger.info(f"  BRR: {brr:.2%}")
+
+    total_run_s = time.perf_counter() - run_start
+    avg_compress = sum(latencies["compress_s"]) / len(latencies["compress_s"]) if latencies["compress_s"] else 0
+    avg_evaluate = sum(latencies["evaluate_s"]) / len(latencies["evaluate_s"]) if latencies["evaluate_s"] else 0
+    logger.info(f"\nLatency:")
+    logger.info(f"  Total run:          {total_run_s:.2f}s")
+    logger.info(f"  Avg compress/sample: {avg_compress:.3f}s")
+    logger.info(f"  Avg evaluate/sample: {avg_evaluate:.3f}s")
+    logger.info(f"  Avg total/sample:    {avg_compress + avg_evaluate:.3f}s")
     
     if save_results:
         results = {
             "compression_rate": compression_rate, "strategy": compression_strategy,
             "context_repair": use_context_repair, "total_samples": total_samples,
-            "stats": stats, "asr": asr, "brr": brr
+            "stats": stats, "asr": asr, "brr": brr,
+            "latency": {
+                "total_run_s": total_run_s,
+                "avg_compress_s": avg_compress,
+                "avg_evaluate_s": avg_evaluate,
+                "avg_total_s": avg_compress + avg_evaluate,
+            }
         }
         os.makedirs("results", exist_ok=True)
         from datetime import datetime
