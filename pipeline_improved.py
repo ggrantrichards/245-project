@@ -177,21 +177,17 @@ class ImprovedCompressor:
         return self._instruct_model, self._instruct_tokenizer
 
     def _get_two_stage(self):
-        """Lazy-init TwoStageCompressor on first use (needs instruct model)."""
+        """Lazy-init TwoStageCompressor on first use.
+
+        Pass *self* directly so TwoStageCompressor can:
+          - use the already-loaded base model for entropy scoring (fast, no extra
+            memory pressure, already warm in GPU cache), and
+          - lazy-load the instruct model only when Stage 2 LLM smoothing is
+            actually needed (i.e. compression_ratio >= 0.3 AND stage1_tokens >= 150).
+        At compression=0.1 the instruct model is never touched at all.
+        """
         if self._two_stage is None:
-            instruct_model, instruct_tokenizer = self._get_instruct_model()
-            # TwoStageCompressor expects .model, .tokenizer, .embedder,
-            # .harm_vector, ._is_instruct_model — use a lightweight adapter
-            # to hand it the instruct variants instead of the base model.
-            class _InstructAdapter:
-                pass
-            adapter = _InstructAdapter()
-            adapter.model = instruct_model
-            adapter.tokenizer = instruct_tokenizer
-            adapter.embedder = self.embedder
-            adapter.harm_vector = self.harm_vector
-            adapter._is_instruct_model = self._is_instruct_model
-            self._two_stage = TwoStageCompressor(adapter)
+            self._two_stage = TwoStageCompressor(self)
         return self._two_stage
 
     def _split_into_sentences(self, text: str) -> List[str]:

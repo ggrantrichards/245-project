@@ -4,11 +4,14 @@ Two-Stage Extract-then-Abstract Compressor
 
 Stage 1 (Extractive): Rule-based extraction of critical elements (user requests,
 tool calls, credentials, dangerous commands) + semantic-safety-scored selection
-of remaining sentences. No LLM involved — uses regex and the embedder only.
+of remaining sentences. Uses the already-loaded base compressor model for entropy
+scoring — no extra GPU memory, no extra model-load latency.
 
 Stage 2 (Abstractive Smoothing): The already-short Stage 1 output is rewritten
-into fluent prose by the 1B-Instruct model. The task is simple paraphrasing,
-which small models handle reliably. Falls back to Stage 1 output on failure.
+into fluent prose by the 1B-Instruct model. Only triggered when
+compression_ratio >= 0.3 AND stage1_tokens >= 150.  The instruct model is
+lazy-loaded on first Stage 2 call via the parent ImprovedCompressor, so at
+low compression ratios (e.g. 0.1) it is never loaded at all.
 
 Usage:
     from two_stage_compressor import TwoStageCompressor
@@ -27,8 +30,13 @@ logger = logging.getLogger(__name__)
 
 
 class TwoStageCompressor:
-    """Drop-in two-stage compression strategy that reuses an ImprovedCompressor's
-    model, tokenizer, and embedder — no extra GPU memory needed."""
+    """Drop-in two-stage compression strategy.
+
+    Receives the parent *ImprovedCompressor* directly so it can:
+      - reuse self.model (base Llama-3.2-1B) for cheap entropy scoring, and
+      - call self._parent._get_instruct_model() lazily only when Stage 2
+        LLM smoothing is actually needed.
+    """
 
     # Regex patterns for lines that must NEVER be dropped.
     # Order: most specific first so we short-circuit quickly.
@@ -43,15 +51,16 @@ class TwoStageCompressor:
     def __init__(self, compressor):
         """
         Args:
-            compressor: An ImprovedCompressor instance whose .model, .tokenizer,
-                        .embedder, .harm_vector, and ._is_instruct_model will be
-                        reused.
+            compressor: An ImprovedCompressor instance.  Its base .model,
+                        .tokenizer, .embedder, and .harm_vector are used for
+                        Stage 1.  Its ._get_instruct_model() is called lazily
+                        for Stage 2 smoothing.
         """
-        self.model = compressor.model
-        self.tokenizer = compressor.tokenizer
+        self._parent = compressor                           # for lazy instruct access
+        self.model = compressor.model                       # base model — for entropy
+        self.tokenizer = compressor.tokenizer               # base tokenizer
         self.embedder = compressor.embedder
         self.harm_vector = compressor.harm_vector
-        self._is_instruct_model = compressor._is_instruct_model
         self._device = next(compressor.model.parameters()).device
 
     # ------------------------------------------------------------------
@@ -88,7 +97,12 @@ class TwoStageCompressor:
         return F.cosine_similarity(embeddings, self.harm_vector.unsqueeze(0))
 
     def _get_entropy_scores(self, sentences: List[str]) -> torch.Tensor:
-        """Per-sentence cross-entropy (proxy for informativeness)."""
+        """Per-sentence cross-entropy using the BASE compressor model.
+
+        The base model (Llama-3.2-1B) is already loaded and warm in GPU
+        cache, so this is fast.  We deliberately avoid the instruct model
+        here — it is heavier and reserved for Stage 2 generation.
+        """
         scores = []
         for sent in sentences:
             if len(sent.strip()) < 5:
@@ -121,27 +135,32 @@ class TwoStageCompressor:
         # Adaptive weighting: if no sentence looks harmful, rely on entropy
         # alone so benign traces don't get over-inflated safety scores.
         max_safety = safety_scores.max().item() if len(safety_scores) > 0 else 0
-        if max_safety < 0.1: # was 0.25
+        if max_safety < 0.1:
             combined = entropy_norm
         else:
             s_min, s_max = safety_scores.min(), safety_scores.max()
             safety_norm = (safety_scores - s_min) / (s_max - s_min + 1e-8)
-            combined = 0.85 * safety_norm + 0.15 * entropy_norm # was 0.6 and 0.4
+            combined = 0.85 * safety_norm + 0.15 * entropy_norm
 
         top_indices = torch.topk(combined, budget).indices.sort().values
         return [sentences[i] for i in top_indices.tolist()]
 
     # ------------------------------------------------------------------
-    # Stage 2 — LLM smoothing (paraphrase rewrite)
+    # Stage 2 — LLM smoothing (paraphrase rewrite, lazy instruct load)
     # ------------------------------------------------------------------
     def _smooth_with_llm(self, text: str, target_tokens: int) -> str:
         """Rewrite *text* into fluent prose using the 1B-Instruct model.
 
-        The input has already been compressed by Stage 1, so it is short
-        enough for a 1B model to paraphrase reliably. Returns the raw
-        Stage 1 text on any generation failure.
+        The instruct model is lazy-loaded via self._parent._get_instruct_model()
+        on first Stage 2 call.  If compression_ratio < 0.3 this method is never
+        called, so the instruct model is never loaded for light compression runs.
+
+        Returns the raw Stage 1 text on any generation failure.
         """
-        if self._is_instruct_model:
+        instruct_model, instruct_tokenizer = self._parent._get_instruct_model()
+        is_instruct = self._parent._is_instruct_model
+
+        if is_instruct:
             messages = [
                 {
                     "role": "system",
@@ -153,12 +172,10 @@ class TwoStageCompressor:
                 },
                 {
                     "role": "user",
-                    "content": (
-                        f"Rewrite in about {target_tokens} tokens:\n\n{text}"
-                    ),
+                    "content": f"Rewrite in about {target_tokens} tokens:\n\n{text}",
                 },
             ]
-            formatted_prompt = self.tokenizer.apply_chat_template(
+            formatted_prompt = instruct_tokenizer.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=True
             )
         else:
@@ -170,18 +187,18 @@ class TwoStageCompressor:
                 "REWRITTEN:\n"
             )
 
-        prompt_inputs = self.tokenizer(
+        prompt_inputs = instruct_tokenizer(
             formatted_prompt, return_tensors="pt", truncation=True, max_length=2048
-        ).to(self._device)
+        ).to(instruct_model.device)
 
         pad_id = (
-            self.tokenizer.pad_token_id
-            if self.tokenizer.pad_token_id is not None
-            else self.tokenizer.eos_token_id
+            instruct_tokenizer.pad_token_id
+            if instruct_tokenizer.pad_token_id is not None
+            else instruct_tokenizer.eos_token_id
         )
 
         with torch.no_grad():
-            output_ids = self.model.generate(
+            output_ids = instruct_model.generate(
                 prompt_inputs.input_ids,
                 max_new_tokens=target_tokens,
                 min_new_tokens=max(16, target_tokens // 4),
@@ -191,7 +208,7 @@ class TwoStageCompressor:
             )
 
         prompt_len = prompt_inputs.input_ids.shape[1]
-        generated = self.tokenizer.decode(
+        generated = instruct_tokenizer.decode(
             output_ids[0][prompt_len:], skip_special_tokens=True
         ).strip()
 
@@ -227,6 +244,7 @@ class TwoStageCompressor:
             Compressed trace as a single string.
         """
         # === Stage 1: Extractive ===
+        logger.debug("[TwoStage] Stage 1: extractive selection")
         critical, remaining = self._extract_critical_elements(text)
 
         # Token budget calculations
@@ -252,11 +270,17 @@ class TwoStageCompressor:
             stage1_output += "\n" + "\n".join(selected_remaining)
 
         # === Stage 2: Abstractive Smoothing ===
-        # Skip LLM if Stage 1 output is already short or compression is light
+        # Skip LLM if Stage 1 output is already short OR compression is light.
+        # This prevents loading the instruct model at all for r < 0.3 runs.
         stage1_tokens = len(self.tokenizer.encode(stage1_output))
         if stage1_tokens < 150 or compression_ratio < 0.3:
+            logger.debug(
+                f"[TwoStage] Stage 2 skipped "
+                f"(stage1_tokens={stage1_tokens}, ratio={compression_ratio:.2f})"
+            )
             return stage1_output
 
+        logger.debug("[TwoStage] Stage 2: LLM smoothing")
         smooth_target = max(48, int(stage1_tokens * 0.8))  # trim another ~20%
         generated = self._smooth_with_llm(stage1_output, smooth_target)
 

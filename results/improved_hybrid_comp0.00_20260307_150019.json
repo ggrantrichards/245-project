@@ -1,0 +1,14 @@
+{
+  "compression_rate": 0.0,
+  "strategy": "hybrid",
+  "context_repair": true,
+  "total_samples": 139,
+  "stats": {
+    "tp": 48,
+    "fn": 18,
+    "fp": 21,
+    "tn": 52
+  },
+  "asr": 0.2727272727272727,
+  "brr": 0.2876712328767123
+}

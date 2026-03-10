@@ -1,0 +1,63 @@
+\relax 
+\bibstyle{acl_natbib}
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{agentdojo}
+\citation{llmail}
+\citation{inan2023llamaguard}
+\citation{jiang2023llmlingua,pan2024llmlingua2}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\citation{jiang2023llmlingua}
+\citation{pan2024llmlingua2}
+\citation{zhao2025attncomp}
+\citation{liskavets2025cpc}
+\citation{inan2023llamaguard}
+\citation{bai2022constitutional}
+\citation{agentdojo}
+\citation{mazeika2024harmbench}
+\citation{llmail}
+\citation{inan2023llamaguard}
+\citation{dubey2024llama}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Related Work}{2}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Prompt Compression.}{2}{section*.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{LLM Safety and Content Moderation.}{2}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Adversarial Prompt Injection.}{2}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Approach}{2}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Pipeline Architecture}{2}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Compression Strategies}{2}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why Sentence-Level?}{2}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Entropy Strategy.}{2}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Safety-Aware Strategy.}{2}{section*.6}\protected@file@percent }
+\citation{mazeika2024harmbench}
+\citation{dubey2024llama}
+\citation{inan2023llamaguard}
+\@writefile{toc}{\contentsline {paragraph}{Sentence-Level Strategy.}{3}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Hybrid Strategy.}{3}{section*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Keyword Force-Preservation}{3}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Context Repair}{3}{subsection.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Safety Critic Prompting}{3}{subsection.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Experiments}{3}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Data}{3}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Evaluation Metrics}{3}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Experimental Details}{3}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Results}{3}{subsection.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Key Findings.}{3}{section*.10}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Full sweep on AgentHarm (N=139: 66 harmful, 73 benign). Best result in \textbf  {bold}. Safety-aware at 10\% compression matches the uncompressed baseline on ASR while reducing BRR by 1.4 pp.}}{4}{table.caption.9}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{tab:main_results}{{1}{4}{Full sweep on AgentHarm (N=139: 66 harmful, 73 benign). Best result in \textbf {bold}. Safety-aware at 10\% compression matches the uncompressed baseline on ASR while reducing BRR by 1.4 pp}{table.caption.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Qualitative Example}{4}{subsection.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Analysis}{4}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Efficiency and Latency Tradeoff}{4}{subsection.5.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Email exfiltration attack trace. Keyword force-preservation (\textit  {forward, password, bank}) and sentence-level selection retain the complete harmful tool call in the safety-aware output. Token-level entropy removes grammatical structure, producing trigger-word fragments that Llama Guard~3 fails to recognize as an attack.}}{4}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:example}{{1}{4}{Email exfiltration attack trace. Keyword force-preservation (\textit {forward, password, bank}) and sentence-level selection retain the complete harmful tool call in the safety-aware output. Token-level entropy removes grammatical structure, producing trigger-word fragments that Llama Guard~3 fails to recognize as an attack}{figure.caption.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Ablation: Sentence-Level vs.\ Token-Level Entropy}{4}{subsection.5.2}\protected@file@percent }
+\citation{agentdojo}
+\citation{inan2023llamaguard}
+\bibstyle{acl_natbib}
+\bibdata{references}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Persistent False Negatives}{5}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Implementation Challenges}{5}{subsection.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Future Work}{5}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{5}{section.7}\protected@file@percent }
+\gdef \@abspage@last{5}

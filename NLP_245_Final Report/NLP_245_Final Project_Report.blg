@@ -1,0 +1,57 @@
+This is BibTeX, Version 0.99d (TeX Live 2025)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: NLP_245_Final Project_Report.aux
+The style file: acl_natbib.bst
+Illegal, another \bibstyle command---line 57 of file NLP_245_Final Project_Report.aux
+ : \bibstyle
+ :          {acl_natbib}
+I'm skipping whatever remains of this command
+Reallocated glb_str_ptr (elt_size=4) to 20 items from 10.
+Reallocated global_strs (elt_size=200001) to 20 items from 10.
+Reallocated glb_str_end (elt_size=4) to 20 items from 10.
+Reallocated singl_function (elt_size=4) to 100 items from 50.
+Reallocated singl_function (elt_size=4) to 100 items from 50.
+Reallocated wiz_functions (elt_size=4) to 6000 items from 3000.
+Database file #1: references.bib
+You've used 10 entries,
+            3764 wiz_defined-function locations,
+            794 strings with 19107 characters,
+and the built_in function-call counts, 29233 in all, are:
+= -- 1945
+> -- 3828
+< -- 0
++ -- 1560
+- -- 1456
+* -- 3200
+:= -- 5130
+add.period$ -- 40
+call.type$ -- 10
+change.case$ -- 725
+chr.to.int$ -- 11
+cite$ -- 10
+duplicate$ -- 488
+empty$ -- 550
+format.name$ -- 1483
+if$ -- 5087
+int.to.chr$ -- 1
+int.to.str$ -- 3
+missing$ -- 137
+newline$ -- 54
+num.names$ -- 40
+pop$ -- 945
+preamble$ -- 1
+purify$ -- 715
+quote$ -- 0
+skip$ -- 1097
+stack$ -- 0
+substring$ -- 146
+swap$ -- 316
+text.length$ -- 1
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 90
+warning$ -- 0
+while$ -- 31
+width$ -- 0
+write$ -- 133
+(There was 1 error message)

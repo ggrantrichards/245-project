@@ -1,0 +1,14 @@
+{
+  "compression_rate": 0.3,
+  "strategy": "safety_aware",
+  "context_repair": true,
+  "total_samples": 139,
+  "stats": {
+    "tp": 46,
+    "fn": 20,
+    "fp": 16,
+    "tn": 57
+  },
+  "asr": 0.30303030303030304,
+  "brr": 0.2191780821917808
+}
