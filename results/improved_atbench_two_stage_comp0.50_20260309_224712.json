@@ -1,0 +1,14 @@
+{
+  "compression_rate": 0.5,
+  "strategy": "two_stage",
+  "context_repair": true,
+  "total_samples": 100,
+  "stats": {
+    "tp": 10,
+    "fn": 40,
+    "fp": 13,
+    "tn": 37
+  },
+  "asr": 0.8,
+  "brr": 0.26
+}
