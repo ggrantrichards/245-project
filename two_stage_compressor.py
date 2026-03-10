@@ -40,12 +40,24 @@ class TwoStageCompressor:
 
     # Regex patterns for lines that must NEVER be dropped.
     # Order: most specific first so we short-circuit quickly.
+    #
+    # ATBench note: format_trace() in pipeline_improved.py normalises:
+    #   role="agent"       → [TOOL_CALL]: {json}
+    #   role="environment" → [TOOL_RESPONSE]: {json}
+    # Both must be treated as critical because:
+    #   - [TOOL_CALL]    encodes tool invocations with potentially harmful arguments
+    #   - [TOOL_RESPONSE] may embed indirect prompt-injection payloads in JSON fields
     CRITICAL_PATTERNS = [
-        re.compile(r'^\[USER\]:'),                                      # user request
-        re.compile(r'^\[SYSTEM\]:'),                                    # system prompt
-        re.compile(r'\[TOOL_CALL\]:'),                                  # tool invocations
+        re.compile(r'^\[USER\]:'),                                          # user request
+        re.compile(r'^\[SYSTEM\]:'),                                        # system prompt
+        re.compile(r'^\[TOOL_CALL\]:'),                                     # normalised tool invocations
+        re.compile(r'^\[TOOL_RESPONSE\]:'),                                 # ATBench environment/tool results
+        re.compile(r'\[TOOL_CALL\]:'),                                      # inline tool call references
         re.compile(r'(?i)(password|credential|api[_\s]?key|secret|token)\s*[:=]'),  # credential assignments
-        re.compile(r'(?i)(sudo|rm\s+-rf|DROP\s+TABLE|DELETE\s+FROM)'),  # dangerous commands
+        re.compile(r'(?i)(sudo|rm\s+-rf|DROP\s+TABLE|DELETE\s+FROM)'),     # dangerous commands
+        # ATBench indirect prompt-injection markers embedded in tool responses
+        re.compile(r'(?i)(hidden_command|system_override|ignore\s+(previous\s+)?instructions)'),
+        re.compile(r'(?i)(attacker_account|exploit_payload|transfer_funds)'),
     ]
 
     def __init__(self, compressor):
@@ -148,6 +160,41 @@ class TwoStageCompressor:
     # ------------------------------------------------------------------
     # Stage 2 — LLM smoothing (paraphrase rewrite, lazy instruct load)
     # ------------------------------------------------------------------
+    @staticmethod
+    def _is_gpu_resident(model) -> bool:
+        """Return True only if the model is fully GPU-resident (no CPU offloading).
+
+        With device_map="auto", accelerate may place SOME layers on CUDA and the
+        rest on CPU when GPU VRAM is insufficient.  The model technically has CUDA
+        parameters, but every forward pass incurs slow CPU↔GPU tensor transfers
+        (accelerate's AlignDevicesHook moves each layer on-demand), making a single
+        LLM generation call take several minutes.
+
+        We check accelerate's `hf_device_map` attribute first (most reliable):
+          - If any layer is mapped to "cpu" or "disk", return False.
+        Then fall back to inspecting actual parameter devices.
+        """
+        # Primary: accelerate always sets hf_device_map when using device_map="auto"
+        device_map = getattr(model, 'hf_device_map', None)
+        if device_map is not None:
+            devices = {str(v) for v in device_map.values()}
+            if 'cpu' in devices or 'disk' in devices:
+                return False
+            # All layers are on GPU (or 'meta' placeholder) — safe to generate
+            return True
+
+        # Fallback: no hf_device_map means the model was not loaded with accelerate;
+        # check if at least one real parameter lives on CUDA.
+        # Note: in PyTorch, tensor.device.type is 'cuda' (not 'cuda:0') —
+        # the index is part of str(device), not device.type.
+        try:
+            for p in model.parameters():
+                if p.device.type == 'cuda':
+                    return True
+            return False
+        except Exception:
+            return False
+
     def _smooth_with_llm(self, text: str, target_tokens: int) -> str:
         """Rewrite *text* into fluent prose using the 1B-Instruct model.
 
@@ -155,10 +202,24 @@ class TwoStageCompressor:
         on first Stage 2 call.  If compression_ratio < 0.3 this method is never
         called, so the instruct model is never loaded for light compression runs.
 
-        Returns the raw Stage 1 text on any generation failure.
+        Returns the raw Stage 1 text on any generation failure (including when
+        the instruct model was CPU-offloaded due to insufficient GPU memory).
         """
         instruct_model, instruct_tokenizer = self._parent._get_instruct_model()
         is_instruct = self._parent._is_instruct_model
+
+        # ── GPU-offload guard ────────────────────────────────────────────────
+        # When Llama-Guard-3-8B occupies most GPU VRAM, accelerate silently
+        # places the instruct model on CPU.  Generating in that state results
+        # in per-layer CPU↔GPU tensor moves — multiple minutes per sample.
+        # We detect this and return Stage 1 output immediately instead.
+        if not self._is_gpu_resident(instruct_model):
+            logger.warning(
+                "[TwoStage] Instruct model is not GPU-resident "
+                "(likely CPU-offloaded due to Llama-Guard memory pressure). "
+                "Skipping Stage 2 LLM smoothing to avoid hang."
+            )
+            return text
 
         if is_instruct:
             messages = [
@@ -279,6 +340,26 @@ class TwoStageCompressor:
                 f"(stage1_tokens={stage1_tokens}, ratio={compression_ratio:.2f})"
             )
             return stage1_output
+
+        # ── Pre-load GPU memory guard ─────────────────────────────────────────
+        # Loading the 1B-Instruct model (≈2.5 GiB in bfloat16) when GPU is nearly
+        # full causes two problems:
+        #   1. Accelerate CPU-offloads the model (slow per-sample generation).
+        #   2. Even partial CUDA allocations fragment remaining VRAM, causing OOM
+        #      when the already-loaded Llama-Guard-3-8B tries to generate on the
+        #      next call.
+        # We check free GPU memory BEFORE triggering the lazy load.  If < 3 GiB
+        # is available we skip Stage 2 entirely — Stage 1 extractive output is
+        # returned without ever touching the instruct model.
+        if torch.cuda.is_available():
+            free_bytes, _ = torch.cuda.mem_get_info()
+            MIN_FREE_BYTES = 3.0 * 1024 ** 3  # 3 GiB minimum for safe 1B load
+            if free_bytes < MIN_FREE_BYTES:
+                logger.warning(
+                    f"[TwoStage] GPU free: {free_bytes / 1e9:.1f} GiB < 3 GiB threshold. "
+                    "Skipping Stage 2 to prevent OOM in downstream critic."
+                )
+                return stage1_output
 
         logger.debug("[TwoStage] Stage 2: LLM smoothing")
         smooth_target = max(48, int(stage1_tokens * 0.8))  # trim another ~20%
