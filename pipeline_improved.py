@@ -382,12 +382,23 @@ class ImprovedCompressor:
 
         # Top-entropy sentences form the semantic selection
         semantic_kept = [s[0] for s in sentence_scores[:num_keep]]
+        # [TOOL_CALL]: and [TOOL_RESPONSE]: lines are ALWAYS force-preserved
+        # regardless of keyword content or entropy score.  These lines encode
+        # structured agent actions and environment responses; they are the
+        # primary input to the ATBench fast-path detectors in
+        # ImprovedSafetyCritic.evaluate().  If they are dropped here, the
+        # fast-paths can never trigger and everything falls through to Llama
+        # Guard — which cannot evaluate agentic trajectories correctly.
+        tool_forced = [
+            s for s in sentences
+            if s.startswith('[TOOL_CALL]:') or s.startswith('[TOOL_RESPONSE]:')
+        ]
         # Keyword-matching sentences are force-preserved on top of the budget
         keyword_forced = [
             s for s in sentences
             if any(kw in s.lower() for kw in self.SAFETY_KEYWORDS)
         ]
-        kept_sentences = list(dict.fromkeys(semantic_kept + keyword_forced))
+        kept_sentences = list(dict.fromkeys(semantic_kept + tool_forced + keyword_forced))
         return " ".join(kept_sentences)
 
     def compress_sentence_level(self, text: str, compression_ratio: float = 0.5) -> str:
@@ -418,6 +429,12 @@ class ImprovedCompressor:
                 
         kept_sentences = safety_sentences + sentence_scores[:num_keep]
         kept_sentences = list(dict.fromkeys([s[0] for s in kept_sentences]))
+        # Force-preserve [TOOL_CALL]: and [TOOL_RESPONSE]: lines unconditionally
+        tool_forced = [
+            s for s in sentences
+            if s.startswith('[TOOL_CALL]:') or s.startswith('[TOOL_RESPONSE]:')
+        ]
+        kept_sentences = list(dict.fromkeys(kept_sentences + tool_forced))
         return " ".join(kept_sentences)
 
     def compress_safety_aware(self, text: str, compression_ratio: float = 0.5) -> str:
@@ -461,10 +478,17 @@ class ImprovedCompressor:
         top_k_indices = torch.topk(combined_scores, num_keep).indices.sort().values
         
         semantic_kept = [sentences[i] for i in top_k_indices.tolist()]
+        # [TOOL_CALL]: and [TOOL_RESPONSE]: lines are ALWAYS force-preserved.
+        # Without this, the fast-path detectors in evaluate() never see the
+        # tool call data and fall through to Llama Guard (ASR stays at 90%).
+        tool_forced = [
+            s for s in sentences
+            if s.startswith('[TOOL_CALL]:') or s.startswith('[TOOL_RESPONSE]:')
+        ]
         # Force-preserve any sentence containing a safety keyword — guaranteed survival
         # regardless of compression ratio or semantic score competition.
         keyword_forced = [s for s in sentences if any(kw in s.lower() for kw in self.SAFETY_KEYWORDS)]
-        kept_sentences = list(dict.fromkeys(semantic_kept + keyword_forced))
+        kept_sentences = list(dict.fromkeys(semantic_kept + tool_forced + keyword_forced))
         return " ".join(kept_sentences)
 
     def compress_abstractive(self, text: str, compression_ratio: float = 0.5) -> str:
